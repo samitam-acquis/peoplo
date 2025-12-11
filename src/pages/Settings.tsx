@@ -26,12 +26,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Building2, CalendarDays, Plus, Pencil, Trash2, Loader2, ShieldAlert } from "lucide-react";
+import { Building2, CalendarDays, Plus, Pencil, Trash2, Loader2, ShieldAlert, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDepartments } from "@/hooks/useEmployees";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useIsAdminOrHR } from "@/hooks/useUserRole";
+import { useIsAdminOrHR, useUserRole } from "@/hooks/useUserRole";
+import { UserRolesManager } from "@/components/settings/UserRolesManager";
 
 // Fetch leave types
 const useLeaveTypes = () => {
@@ -65,7 +66,8 @@ const Settings = () => {
   const [activeTab, setActiveTab] = useState("departments");
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isAdminOrHR, isLoading: roleLoading } = useIsAdminOrHR();
+  const { isAdminOrHR, isLoading: roleLoading, role } = useIsAdminOrHR();
+  const isAdmin = role === 'admin';
   
   // Department state
   const [deptDialogOpen, setDeptDialogOpen] = useState(false);
@@ -284,6 +286,12 @@ const Settings = () => {
               <CalendarDays className="h-4 w-4" />
               Leave Types
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="user-roles" className="gap-2">
+                <Users className="h-4 w-4" />
+                User Roles
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Departments Tab */}
@@ -520,6 +528,13 @@ const Settings = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* User Roles Tab - Admin Only */}
+          {isAdmin && (
+            <TabsContent value="user-roles" className="mt-6">
+              <UserRolesManager />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </DashboardLayout>
