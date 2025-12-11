@@ -2,6 +2,7 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import {
   Users,
   Calendar,
@@ -34,17 +35,18 @@ interface NavItem {
   href: string;
   icon: ReactNode;
   badge?: number;
+  adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: <Home className="h-5 w-5" /> },
   { label: "Employees", href: "/employees", icon: <Users className="h-5 w-5" /> },
-  { label: "Onboarding", href: "/onboarding", icon: <UserPlus className="h-5 w-5" /> },
+  { label: "Onboarding", href: "/onboarding", icon: <UserPlus className="h-5 w-5" />, adminOnly: true },
   { label: "Leave Management", href: "/leaves", icon: <Calendar className="h-5 w-5" /> },
   { label: "Assets", href: "/assets", icon: <Package className="h-5 w-5" /> },
-  { label: "Payroll", href: "/payroll", icon: <CreditCard className="h-5 w-5" /> },
+  { label: "Payroll", href: "/payroll", icon: <CreditCard className="h-5 w-5" />, adminOnly: true },
   { label: "Reports", href: "/reports", icon: <ClipboardList className="h-5 w-5" /> },
-  { label: "Settings", href: "/settings", icon: <Settings className="h-5 w-5" /> },
+  { label: "Settings", href: "/settings", icon: <Settings className="h-5 w-5" />, adminOnly: true },
 ];
 
 interface DashboardLayoutProps {
@@ -56,6 +58,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const { isAdminOrHR } = useIsAdminOrHR();
+
+  const filteredNavItems = navItems.filter(item => !item.adminOnly || isAdminOrHR);
 
   const handleSignOut = async () => {
     await signOut();
@@ -110,7 +115,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto px-4 py-6">
             <ul className="space-y-2">
-              {navItems.map((item) => {
+              {filteredNavItems.map((item) => {
                 const isActive = location.pathname === item.href;
                 return (
                   <li key={item.href}>
