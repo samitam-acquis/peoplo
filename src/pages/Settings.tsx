@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Navigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,11 +26,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Building2, CalendarDays, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Building2, CalendarDays, Plus, Pencil, Trash2, Loader2, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDepartments } from "@/hooks/useEmployees";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsAdminOrHR } from "@/hooks/useUserRole";
 
 // Fetch leave types
 const useLeaveTypes = () => {
@@ -63,6 +65,7 @@ const Settings = () => {
   const [activeTab, setActiveTab] = useState("departments");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAdminOrHR, isLoading: roleLoading } = useIsAdminOrHR();
   
   // Department state
   const [deptDialogOpen, setDeptDialogOpen] = useState(false);
@@ -81,6 +84,31 @@ const Settings = () => {
 
   const { data: departments = [], isLoading: loadingDepts } = useDepartments();
   const { data: leaveTypes = [], isLoading: loadingLeaves } = useLeaveTypes();
+
+  // Show loading while checking role
+  if (roleLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-[400px] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Redirect non-admin/HR users
+  if (!isAdminOrHR) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-[400px] flex-col items-center justify-center space-y-4">
+          <ShieldAlert className="h-16 w-16 text-destructive" />
+          <h2 className="text-2xl font-bold text-foreground">Access Denied</h2>
+          <p className="text-muted-foreground">You don't have permission to access this page.</p>
+          <p className="text-sm text-muted-foreground">Only administrators and HR personnel can manage settings.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   // Department mutations
   const createDeptMutation = useMutation({
