@@ -82,16 +82,18 @@ const LeaveApprovals = () => {
     mutationFn: async ({ 
       requestId, 
       status, 
-      reviewNotes 
+      reviewNotes,
+      employeeEmail,
     }: { 
       requestId: string; 
       status: "approved" | "rejected"; 
       reviewNotes: string;
+      employeeEmail: string;
     }) => {
-      // Get current user's employee ID for reviewed_by
+      // Get current user's employee data for reviewed_by and name
       const { data: employeeData } = await supabase
         .from("employees")
-        .select("id")
+        .select("id, first_name, last_name")
         .eq("user_id", user?.id)
         .maybeSingle();
 
@@ -106,6 +108,22 @@ const LeaveApprovals = () => {
         .eq("id", requestId);
 
       if (error) throw error;
+
+      // Send notification (fire and forget)
+      const reviewerName = employeeData 
+        ? `${employeeData.first_name} ${employeeData.last_name}` 
+        : "HR Team";
+
+      supabase.functions.invoke("leave-status-notification", {
+        body: {
+          request_id: requestId,
+          status,
+          reviewer_name: reviewerName,
+          review_notes: reviewNotes.trim() || undefined,
+        }
+      }).catch(err => {
+        console.error("Failed to send leave status notification:", err);
+      });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["leave-approvals"] });
@@ -134,6 +152,7 @@ const LeaveApprovals = () => {
       requestId: selectedRequest.id,
       status: actionType === "approve" ? "approved" : "rejected",
       reviewNotes,
+      employeeEmail: selectedRequest.employees?.email || "",
     });
   };
 
