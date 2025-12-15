@@ -23,6 +23,7 @@ import {
   Line,
 } from "recharts";
 import { Download, FileText, Users, Calendar, CreditCard } from "lucide-react";
+import { PayrollSummaryReport } from "@/components/reports/PayrollSummaryReport";
 
 const employeeGrowthData = [
   { month: "Jan", employees: 210 },
@@ -272,6 +273,9 @@ const Reports = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Payroll Summary Report */}
+        <PayrollSummaryReport />
       </div>
     </DashboardLayout>
   );
