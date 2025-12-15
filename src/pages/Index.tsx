@@ -5,6 +5,7 @@ import { LeaveCalendar } from "@/components/dashboard/LeaveCalendar";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { PerformanceWidget } from "@/components/dashboard/PerformanceWidget";
 import { PendingApprovalsWidget } from "@/components/dashboard/PendingApprovalsWidget";
+import { TeamLeaveCalendar } from "@/components/dashboard/TeamLeaveCalendar";
 import { Users, Calendar, Package, CreditCard, ClipboardCheck } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -88,6 +89,7 @@ const Index = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             <PendingApprovalsWidget />
+            <TeamLeaveCalendar />
             <QuickActions />
             <PerformanceWidget />
             <LeaveCalendar />
