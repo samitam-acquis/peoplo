@@ -48,6 +48,7 @@ const ReviewsManagement = () => {
   const { user } = useAuth();
   const { isAdminOrHR, isLoading: isRoleLoading } = useIsAdminOrHR();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [formData, setFormData] = useState({
     employee_id: "",
     review_period: "",
@@ -62,6 +63,11 @@ const ReviewsManagement = () => {
   const { data: reviews, isLoading } = useAllPerformanceReviews();
   const { data: employees } = useEmployees();
   const createMutation = useCreateReview();
+
+  // Filter reviews by status
+  const filteredReviews = reviews?.filter((review: any) => 
+    statusFilter === "all" ? true : review.status === statusFilter
+  );
 
   // Get current user's employee ID
   const { data: currentEmployee } = useQuery({
@@ -188,17 +194,30 @@ const ReviewsManagement = () => {
             <h2 className="text-2xl font-bold text-foreground">Reviews Management</h2>
             <p className="text-muted-foreground">Create and manage employee performance reviews</p>
           </div>
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Review
-          </Button>
+          <div className="flex items-center gap-3">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="submitted">Submitted</SelectItem>
+                <SelectItem value="acknowledged">Acknowledged</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Review
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : reviews && reviews.length > 0 ? (
+        ) : filteredReviews && filteredReviews.length > 0 ? (
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -213,7 +232,7 @@ const ReviewsManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reviews.map((review: any) => (
+                  {filteredReviews.map((review: any) => (
                     <TableRow key={review.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
