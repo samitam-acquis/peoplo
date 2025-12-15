@@ -4,10 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, User, Mail, Phone, MapPin, Building2, Calendar, Briefcase, Save } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, User, Mail, Phone, MapPin, Building2, Calendar, Briefcase, Save, Shield, FileText, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -30,6 +39,7 @@ interface EmployeeProfile {
   designation: string;
   hire_date: string;
   date_of_birth: string | null;
+  gender: string | null;
   status: string;
   department: { name: string } | null;
 }
@@ -39,6 +49,8 @@ interface ProfileForm {
   address: string;
   city: string;
   country: string;
+  date_of_birth: string;
+  gender: string;
 }
 
 const Profile = () => {
@@ -51,6 +63,8 @@ const Profile = () => {
     address: '',
     city: '',
     country: '',
+    date_of_birth: '',
+    gender: '',
   });
 
   // Fetch employee profile linked to current user
@@ -74,6 +88,7 @@ const Profile = () => {
           designation,
           hire_date,
           date_of_birth,
+          gender,
           status,
           departments (name)
         `)
@@ -119,6 +134,8 @@ const Profile = () => {
         address: employee.address || '',
         city: employee.city || '',
         country: employee.country || '',
+        date_of_birth: employee.date_of_birth || '',
+        gender: employee.gender || '',
       });
     }
   }, [employee]);
@@ -134,6 +151,8 @@ const Profile = () => {
           address: data.address.trim() || null,
           city: data.city.trim() || null,
           country: data.country.trim() || null,
+          date_of_birth: data.date_of_birth || null,
+          gender: data.gender || null,
         })
         .eq('id', employee.id);
 
@@ -257,6 +276,8 @@ const Profile = () => {
                         address: employee.address || '',
                         city: employee.city || '',
                         country: employee.country || '',
+                        date_of_birth: employee.date_of_birth || '',
+                        gender: employee.gender || '',
                       });
                     }}>
                       Cancel
@@ -335,12 +356,37 @@ const Profile = () => {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Date of Birth</Label>
-                    <Input value={formatDate(employee.date_of_birth)} disabled />
+                    <Input 
+                      type="date"
+                      value={formData.date_of_birth}
+                      onChange={(e) => setFormData(prev => ({ ...prev, date_of_birth: e.target.value }))}
+                      disabled={!isEditing}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label>Department</Label>
-                    <Input value={employee.department?.name || "Not Assigned"} disabled />
+                    <Label>Gender</Label>
+                    <Select
+                      value={formData.gender}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, gender: value }))}
+                      disabled={!isEditing}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Department</Label>
+                  <Input value={employee.department?.name || "Not Assigned"} disabled />
+                  <p className="text-xs text-muted-foreground">Contact HR to change department assignment</p>
                 </div>
               </CardContent>
             </Card>
