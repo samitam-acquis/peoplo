@@ -24,7 +24,7 @@ import {
   Line,
   Legend,
 } from "recharts";
-import { Download, FileText, Users, Calendar, CreditCard } from "lucide-react";
+import { Download, FileText, Users, Calendar, CreditCard, TrendingUp, TrendingDown, UserPlus, UserMinus } from "lucide-react";
 import { PayrollSummaryReport } from "@/components/reports/PayrollSummaryReport";
 import { LeaveBalanceReport } from "@/components/reports/LeaveBalanceReport";
 import { AssetInventoryReport } from "@/components/reports/AssetInventoryReport";
@@ -34,6 +34,7 @@ import {
   useDepartmentDistribution,
   useLeaveStatistics,
   usePayrollTrend,
+  useHeadcountSummary,
 } from "@/hooks/useReportsData";
 
 const currentYear = new Date().getFullYear();
@@ -62,6 +63,7 @@ const Reports = () => {
   const { data: departmentData, isLoading: isLoadingDept } = useDepartmentDistribution();
   const { data: leaveStats, isLoading: isLoadingLeave } = useLeaveStatistics(year);
   const { data: payrollTrendData, isLoading: isLoadingPayroll } = usePayrollTrend(year);
+  const { data: headcountData, isLoading: isLoadingHeadcount } = useHeadcountSummary(year);
 
   return (
     <DashboardLayout>
@@ -105,6 +107,102 @@ const Reports = () => {
             </Card>
           ))}
         </div>
+
+        {/* Headcount Summary Widget */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Headcount Summary
+            </CardTitle>
+            <CardDescription>New hires, terminations, and net change for {selectedYear}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingHeadcount ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-24" />
+                ))}
+              </div>
+            ) : headcountData ? (
+              <div className="space-y-6">
+                {/* Summary Stats */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Current Headcount</p>
+                    </div>
+                    <p className="mt-2 text-3xl font-bold">{headcountData.currentHeadcount}</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Start of Year</p>
+                    </div>
+                    <p className="mt-2 text-3xl font-bold">{headcountData.startOfYearHeadcount}</p>
+                  </div>
+                  <div className="rounded-lg border bg-green-500/10 p-4">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="h-4 w-4 text-green-600" />
+                      <p className="text-sm text-green-600">New Hires</p>
+                    </div>
+                    <p className="mt-2 text-3xl font-bold text-green-600">+{headcountData.newHires}</p>
+                  </div>
+                  <div className="rounded-lg border bg-red-500/10 p-4">
+                    <div className="flex items-center gap-2">
+                      <UserMinus className="h-4 w-4 text-red-600" />
+                      <p className="text-sm text-red-600">Terminations</p>
+                    </div>
+                    <p className="mt-2 text-3xl font-bold text-red-600">-{headcountData.terminations}</p>
+                  </div>
+                  <div className={`rounded-lg border p-4 ${headcountData.netChange >= 0 ? 'bg-primary/10' : 'bg-orange-500/10'}`}>
+                    <div className="flex items-center gap-2">
+                      {headcountData.netChange >= 0 ? (
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-orange-600" />
+                      )}
+                      <p className={`text-sm ${headcountData.netChange >= 0 ? 'text-primary' : 'text-orange-600'}`}>
+                        Net Change
+                      </p>
+                    </div>
+                    <p className={`mt-2 text-3xl font-bold ${headcountData.netChange >= 0 ? 'text-primary' : 'text-orange-600'}`}>
+                      {headcountData.netChange >= 0 ? '+' : ''}{headcountData.netChange}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Monthly Breakdown Chart */}
+                <div className="h-[250px]">
+                  {headcountData.monthlyBreakdown.some((m) => m.hires > 0 || m.terminations > 0) ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={headcountData.monthlyBreakdown}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "hsl(var(--card))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: "8px",
+                          }}
+                        />
+                        <Legend />
+                        <Bar dataKey="hires" name="New Hires" fill="hsl(142, 76%, 36%)" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="terminations" name="Terminations" fill="hsl(0, 84%, 60%)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <p className="text-muted-foreground">No headcount changes recorded for {selectedYear}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
 
         {/* Charts Grid */}
         <div className="grid gap-6 lg:grid-cols-2">
