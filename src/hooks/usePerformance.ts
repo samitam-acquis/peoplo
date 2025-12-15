@@ -173,6 +173,7 @@ export function useCreateReview() {
     mutationFn: async (review: {
       employee_id: string;
       reviewer_id: string | null;
+      reviewer_name?: string;
       review_period: string;
       review_date: string;
       overall_rating: number | null;
@@ -181,13 +182,30 @@ export function useCreateReview() {
       comments?: string;
       status?: string;
     }) => {
+      const { reviewer_name, ...reviewData } = review;
+      
       const { data, error } = await supabase
         .from("performance_reviews")
-        .insert(review)
+        .insert(reviewData)
         .select()
         .single();
 
       if (error) throw error;
+
+      // Send notification (fire and forget)
+      supabase.functions.invoke("review-notification", {
+        body: {
+          review_id: data.id,
+          employee_id: review.employee_id,
+          reviewer_name: reviewer_name || "HR Team",
+          review_period: review.review_period,
+          overall_rating: review.overall_rating,
+          status: review.status || "draft"
+        }
+      }).catch(err => {
+        console.error("Failed to send review notification:", err);
+      });
+
       return data;
     },
     onSuccess: () => {

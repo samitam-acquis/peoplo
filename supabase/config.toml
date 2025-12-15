@@ -2,3 +2,6 @@ project_id = "ppdsxgkmnmjfwmpnamts"
 
 [functions.goal-reminders]
 verify_jwt = false
+
+[functions.review-notification]
+verify_jwt = false
