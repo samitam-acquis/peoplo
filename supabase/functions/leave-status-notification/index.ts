@@ -1,0 +1,140 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.87.1";
+import { Resend } from "https://esm.sh/resend@2.0.0";
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+interface LeaveStatusNotificationRequest {
+  request_id: string;
+  status: "approved" | "rejected";
+  reviewer_name: string;
+  review_notes?: string;
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const payload: LeaveStatusNotificationRequest = await req.json();
+
+    console.log("Processing leave status notification:", payload);
+
+    // Get leave request with employee and leave type details
+    const { data: leaveRequest, error: requestError } = await supabase
+      .from("leave_requests")
+      .select(`
+        id,
+        start_date,
+        end_date,
+        days_count,
+        employee_id,
+        leave_type_id
+      `)
+      .eq("id", payload.request_id)
+      .single();
+
+    if (requestError || !leaveRequest) {
+      console.error("Error fetching leave request:", requestError);
+      throw new Error("Leave request not found");
+    }
+
+    // Get leave type name
+    const { data: leaveType } = await supabase
+      .from("leave_types")
+      .select("name")
+      .eq("id", leaveRequest.leave_type_id)
+      .single();
+
+    // Get employee details
+    const { data: employee, error: employeeError } = await supabase
+      .from("employees")
+      .select("id, first_name, last_name, email, user_id")
+      .eq("id", leaveRequest.employee_id)
+      .single();
+
+    if (employeeError || !employee) {
+      console.error("Error fetching employee:", employeeError);
+      throw new Error("Employee not found");
+    }
+
+    console.log("Sending notification to:", employee.email);
+
+    const statusText = payload.status === "approved" ? "Approved" : "Rejected";
+    const statusColor = payload.status === "approved" ? "#4caf50" : "#f44336";
+    const leaveTypeName = leaveType?.name || "Leave";
+
+    // Create in-app notification
+    if (employee.user_id) {
+      const { error: notifError } = await supabase
+        .from("notifications")
+        .insert({
+          user_id: employee.user_id,
+          title: `Leave Request ${statusText}`,
+          message: `Your ${leaveTypeName} request for ${leaveRequest.days_count} day(s) has been ${payload.status} by ${payload.reviewer_name}.`,
+          type: payload.status === "approved" ? "success" : "warning",
+          link: "/leaves"
+        });
+
+      if (notifError) {
+        console.error("Error creating notification:", notifError);
+      } else {
+        console.log("In-app notification created successfully");
+      }
+    }
+
+    // Send email notification
+    const emailResult = await resend.emails.send({
+      from: "HR System <onboarding@resend.dev>",
+      to: [employee.email],
+      subject: `Leave Request ${statusText} - ${leaveTypeName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">Leave Request ${statusText}</h2>
+          <p>Hi ${employee.first_name},</p>
+          <p>Your leave request has been <strong style="color: ${statusColor};">${payload.status}</strong> by ${payload.reviewer_name}.</p>
+          
+          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${statusColor};">
+            <p style="margin: 0;"><strong>Leave Type:</strong> ${leaveTypeName}</p>
+            <p style="margin: 10px 0 0;"><strong>Duration:</strong> ${leaveRequest.days_count} day(s)</p>
+            <p style="margin: 10px 0 0;"><strong>Dates:</strong> ${leaveRequest.start_date} to ${leaveRequest.end_date}</p>
+            <p style="margin: 10px 0 0;"><strong>Status:</strong> ${statusText}</p>
+            ${payload.review_notes ? `<p style="margin: 10px 0 0;"><strong>Notes:</strong> ${payload.review_notes}</p>` : ""}
+          </div>
+          
+          <p>Log in to your HR portal to view more details.</p>
+          
+          <p style="margin-top: 30px;">Best regards,<br>HR Team</p>
+        </div>
+      `,
+    });
+
+    console.log("Email sent:", emailResult);
+
+    return new Response(
+      JSON.stringify({ success: true, emailResult }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  } catch (error: any) {
+    console.error("Error in leave-status-notification function:", error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+});
