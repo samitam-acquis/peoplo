@@ -4,6 +4,7 @@ import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { LeaveCalendar } from "@/components/dashboard/LeaveCalendar";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { PerformanceWidget } from "@/components/dashboard/PerformanceWidget";
+import { PendingApprovalsWidget } from "@/components/dashboard/PendingApprovalsWidget";
 import { Users, Calendar, Package, CreditCard } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,6 +71,7 @@ const Index = () => {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            <PendingApprovalsWidget />
             <QuickActions />
             <PerformanceWidget />
             <LeaveCalendar />
