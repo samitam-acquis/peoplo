@@ -28,6 +28,8 @@ export interface PerformanceReview {
   comments: string | null;
   status: string;
   created_at: string;
+  acknowledged_at: string | null;
+  acknowledged_by: string | null;
   reviewer?: { first_name: string; last_name: string } | null;
 }
 
@@ -215,6 +217,33 @@ export function useCreateReview() {
     },
     onError: (error) => {
       toast.error("Failed to create review: " + error.message);
+    },
+  });
+}
+
+export function useAcknowledgeReview() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ reviewId, userId }: { reviewId: string; userId: string }) => {
+      const { error } = await supabase
+        .from("performance_reviews")
+        .update({
+          acknowledged_at: new Date().toISOString(),
+          acknowledged_by: userId,
+          status: "acknowledged",
+        })
+        .eq("id", reviewId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["performance-reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["all-performance-reviews"] });
+      toast.success("Review acknowledged");
+    },
+    onError: (error) => {
+      toast.error("Failed to acknowledge review: " + error.message);
     },
   });
 }

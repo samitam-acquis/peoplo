@@ -563,6 +563,8 @@ export type Database = {
       }
       performance_reviews: {
         Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
           areas_for_improvement: string | null
           comments: string | null
           created_at: string
@@ -577,6 +579,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
           areas_for_improvement?: string | null
           comments?: string | null
           created_at?: string
@@ -591,6 +595,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
           areas_for_improvement?: string | null
           comments?: string | null
           created_at?: string

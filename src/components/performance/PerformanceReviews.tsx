@@ -1,7 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Star, FileText, Loader2 } from "lucide-react";
-import { usePerformanceReviews } from "@/hooks/usePerformance";
+import { Button } from "@/components/ui/button";
+import { Star, FileText, Loader2, CheckCircle } from "lucide-react";
+import { usePerformanceReviews, useAcknowledgeReview } from "@/hooks/usePerformance";
+import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 
 interface PerformanceReviewsProps {
@@ -15,7 +17,9 @@ const statusColors: Record<string, string> = {
 };
 
 export function PerformanceReviews({ employeeId }: PerformanceReviewsProps) {
+  const { user } = useAuth();
   const { data: reviews, isLoading } = usePerformanceReviews(employeeId);
+  const acknowledgeMutation = useAcknowledgeReview();
 
   if (isLoading) {
     return (
@@ -97,6 +101,26 @@ export function PerformanceReviews({ employeeId }: PerformanceReviewsProps) {
                   <div className="space-y-1">
                     <p className="text-sm font-medium">Comments</p>
                     <p className="text-sm text-muted-foreground">{review.comments}</p>
+                  </div>
+                )}
+
+                {review.status === "submitted" && user && (
+                  <div className="pt-2 border-t">
+                    <Button
+                      size="sm"
+                      onClick={() => acknowledgeMutation.mutate({ reviewId: review.id, userId: user.id })}
+                      disabled={acknowledgeMutation.isPending}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      {acknowledgeMutation.isPending ? "Acknowledging..." : "Acknowledge Review"}
+                    </Button>
+                  </div>
+                )}
+
+                {review.acknowledged_at && (
+                  <div className="pt-2 border-t text-sm text-muted-foreground">
+                    <CheckCircle className="h-4 w-4 inline mr-1 text-emerald-600" />
+                    Acknowledged on {format(new Date(review.acknowledged_at), "MMMM d, yyyy")}
                   </div>
                 )}
               </div>
