@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle2, Upload, User, Briefcase, FileText, Loader2, ShieldAlert, Calendar, Mail, Phone, MapPin, Pencil } from "lucide-react";
+import { CheckCircle2, Upload, User, Briefcase, FileText, Loader2, ShieldAlert, Calendar, Mail, Phone, MapPin, Pencil, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDepartments } from "@/hooks/useEmployees";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -128,6 +128,13 @@ const generateEmployeeCode = () => {
   return `${prefix}-${timestamp}${random}`;
 };
 
+interface DocumentUpload {
+  file: File | null;
+  uploading: boolean;
+  uploaded: boolean;
+  url: string | null;
+}
+
 interface FormData {
   firstName: string;
   lastName: string;
@@ -158,6 +165,18 @@ const initialFormData: FormData = {
   linkedUserId: '',
 };
 
+const DOCUMENT_TYPES = [
+  { key: 'id_proof', label: 'ID Proof', accept: '.pdf,.jpg,.jpeg,.png' },
+  { key: 'offer_letter', label: 'Offer Letter', accept: '.pdf,.doc,.docx' },
+  { key: 'resume', label: 'Resume', accept: '.pdf,.doc,.docx' },
+];
+
+const initialDocuments: Record<string, DocumentUpload> = {
+  id_proof: { file: null, uploading: false, uploaded: false, url: null },
+  offer_letter: { file: null, uploading: false, uploaded: false, url: null },
+  resume: { file: null, uploading: false, uploaded: false, url: null },
+};
+
 const Onboarding = () => {
   const [activeTab, setActiveTab] = useState("add");
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null);
@@ -174,6 +193,7 @@ const Onboarding = () => {
     joinDate: '',
   });
   const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [documents, setDocuments] = useState<Record<string, DocumentUpload>>(initialDocuments);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isAdminOrHR, isLoading: roleLoading } = useIsAdminOrHR();
@@ -182,6 +202,44 @@ const Onboarding = () => {
   const { data: managers = [], isLoading: loadingManagers } = useManagers();
   const { data: onboardingEmployees = [], isLoading: loadingOnboarding } = useOnboardingEmployees();
   const { data: unlinkedUsers = [], isLoading: loadingUsers } = useUnlinkedUsers();
+
+  // Handle file selection
+  const handleFileSelect = (docType: string, file: File | null) => {
+    setDocuments(prev => ({
+      ...prev,
+      [docType]: { ...prev[docType], file, uploaded: false, url: null }
+    }));
+  };
+
+  // Upload a single document
+  const uploadDocument = async (employeeId: string, docType: string, file: File) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${employeeId}/${docType}_${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('employee-documents')
+      .upload(fileName, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('employee-documents')
+      .getPublicUrl(fileName);
+
+    // Store document reference in database
+    const { error: dbError } = await supabase
+      .from('employee_documents')
+      .insert({
+        employee_id: employeeId,
+        document_type: docType,
+        document_name: file.name,
+        file_url: fileName, // Store path, not public URL (bucket is private)
+      });
+
+    if (dbError) throw dbError;
+
+    return fileName;
+  };
 
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -209,6 +267,18 @@ const Onboarding = () => {
         .single();
       
       if (employeeError) throw employeeError;
+
+      // Upload documents
+      const docsToUpload = Object.entries(documents).filter(([_, doc]) => doc.file);
+      for (const [docType, doc] of docsToUpload) {
+        if (doc.file) {
+          try {
+            await uploadDocument(employee.id, docType, doc.file);
+          } catch (err) {
+            console.error(`Failed to upload ${docType}:`, err);
+          }
+        }
+      }
 
       // If salary is provided, create salary structure
       if (data.salary && parseFloat(data.salary) > 0) {
@@ -245,6 +315,7 @@ const Onboarding = () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.invalidateQueries({ queryKey: ['unlinked-users'] });
       setFormData(initialFormData);
+      setDocuments(initialDocuments);
       setActiveTab('pending');
       toast({
         title: "Employee Added",
@@ -701,22 +772,66 @@ const Onboarding = () => {
                       </div>
                       <div>
                         <CardTitle className="text-lg">Documents</CardTitle>
-                        <CardDescription>Upload required documents (coming soon)</CardDescription>
+                        <CardDescription>Upload required documents (optional)</CardDescription>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-4 sm:grid-cols-3">
-                      {["ID Proof", "Offer Letter", "Resume"].map((doc) => (
-                        <div
-                          key={doc}
-                          className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-6 transition-colors hover:border-primary hover:bg-primary/5 opacity-50 cursor-not-allowed"
-                        >
-                          <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
-                          <p className="text-sm font-medium text-foreground">{doc}</p>
-                          <p className="text-xs text-muted-foreground">Coming soon</p>
-                        </div>
-                      ))}
+                      {DOCUMENT_TYPES.map((docType) => {
+                        const doc = documents[docType.key];
+                        return (
+                          <label
+                            key={docType.key}
+                            className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-colors cursor-pointer ${
+                              doc.file 
+                                ? 'border-primary bg-primary/5' 
+                                : 'border-border hover:border-primary hover:bg-primary/5'
+                            } ${isSubmitting ? 'opacity-50 pointer-events-none' : ''}`}
+                          >
+                            <input
+                              type="file"
+                              accept={docType.accept}
+                              className="sr-only"
+                              disabled={isSubmitting}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                handleFileSelect(docType.key, file);
+                              }}
+                            />
+                            {doc.file ? (
+                              <>
+                                <Check className="mb-2 h-8 w-8 text-primary" />
+                                <p className="text-sm font-medium text-foreground truncate max-w-full px-2">
+                                  {doc.file.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(doc.file.size / 1024).toFixed(1)} KB
+                                </p>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="absolute top-2 right-2 h-6 w-6"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleFileSelect(docType.key, null);
+                                  }}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
+                                <p className="text-sm font-medium text-foreground">{docType.label}</p>
+                                <p className="text-xs text-muted-foreground">Click to upload</p>
+                              </>
+                            )}
+                          </label>
+                        );
+                      })}
                     </div>
                   </CardContent>
                 </Card>
@@ -727,7 +842,10 @@ const Onboarding = () => {
                   variant="outline" 
                   type="button"
                   disabled={isSubmitting}
-                  onClick={() => setFormData(initialFormData)}
+                  onClick={() => {
+                    setFormData(initialFormData);
+                    setDocuments(initialDocuments);
+                  }}
                 >
                   Clear Form
                 </Button>
