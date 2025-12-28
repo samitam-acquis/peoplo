@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Shield, Users, Calendar } from "lucide-react";
 import { z } from "zod";
 import hrHubLogo from "@/assets/hr-hub-logo.svg";
+import hrHubLogoLight from "@/assets/hr-hub-logo-light.svg";
 
 const loginSchema = z.object({
   email: z.string().trim().email("Please enter a valid email address"),
@@ -149,7 +150,7 @@ const Auth = () => {
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-primary p-12 text-primary-foreground">
         <div>
           <div className="flex items-center gap-3">
-            <img src={hrHubLogo} alt="HR Hub" className="h-12 w-auto" />
+            <img src={hrHubLogoLight} alt="HR Hub" className="h-12 w-auto" />
             <h1 className="text-3xl font-bold">HR Hub</h1>
           </div>
         </div>
