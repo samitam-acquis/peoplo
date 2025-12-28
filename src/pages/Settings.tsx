@@ -298,7 +298,7 @@ const Settings = () => {
           {/* Departments Tab */}
           <TabsContent value="departments" className="mt-6">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle>Departments</CardTitle>
                   <CardDescription>Manage company departments</CardDescription>
@@ -401,7 +401,7 @@ const Settings = () => {
           {/* Leave Types Tab */}
           <TabsContent value="leave-types" className="mt-6">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle>Leave Types</CardTitle>
                   <CardDescription>Configure available leave types and their policies</CardDescription>
