@@ -193,12 +193,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 {navItems.find((item) => item.href === location.pathname)?.label || "Dashboard"}
               </h1>
               <p className="text-sm text-muted-foreground">
-                {new Date().toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
+                <span className="hidden sm:inline">
+                  {new Date().toLocaleDateString("en-US", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </span>
+                <span className="sm:hidden">
+                  {new Date().toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </span>
               </p>
             </div>
           </div>
