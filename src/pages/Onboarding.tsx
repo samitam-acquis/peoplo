@@ -641,10 +641,14 @@ const Onboarding = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="add">Add New Employee</TabsTrigger>
-            <TabsTrigger value="pending">
-              Pending Onboarding
+          <TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:h-10 sm:max-w-md sm:grid-cols-2">
+            <TabsTrigger value="add" className="w-full justify-center">
+              <span className="hidden sm:inline">Add New Employee</span>
+              <span className="sm:hidden">New Employee</span>
+            </TabsTrigger>
+            <TabsTrigger value="pending" className="w-full justify-center">
+              <span className="hidden sm:inline">Pending Onboarding</span>
+              <span className="sm:hidden">Pending</span>
               <Badge variant="secondary" className="ml-2">
                 {onboardingEmployees.length}
               </Badge>
