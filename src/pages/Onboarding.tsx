@@ -1149,13 +1149,13 @@ const Onboarding = () => {
                   {/* Upload Additional Document */}
                   <div className="space-y-3 pt-2 border-t">
                     <p className="text-xs font-medium text-muted-foreground">Upload Additional Document</p>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <Select
                         value={additionalDoc.type}
                         onValueChange={(value) => setAdditionalDoc(prev => ({ ...prev, type: value }))}
                         disabled={isUploadingAdditional}
                       >
-                        <SelectTrigger className="w-[140px]">
+                        <SelectTrigger className="w-full sm:w-[140px]">
                           <SelectValue placeholder="Type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1166,29 +1166,29 @@ const Onboarding = () => {
                           ))}
                         </SelectContent>
                       </Select>
-                      <div className="flex-1">
+                      <div className="flex gap-2 flex-1">
                         <Input
                           type="file"
                           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                           disabled={isUploadingAdditional}
                           onChange={(e) => setAdditionalDoc(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
-                          className="text-xs"
+                          className="text-xs flex-1 min-w-0"
                         />
+                        <Button
+                          size="sm"
+                          onClick={handleUploadAdditionalDocument}
+                          disabled={isUploadingAdditional || !additionalDoc.file || !additionalDoc.type}
+                        >
+                          {isUploadingAdditional ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Upload className="h-4 w-4" />
+                          )}
+                        </Button>
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={handleUploadAdditionalDocument}
-                        disabled={isUploadingAdditional || !additionalDoc.file || !additionalDoc.type}
-                      >
-                        {isUploadingAdditional ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Upload className="h-4 w-4" />
-                        )}
-                      </Button>
                     </div>
                     {additionalDoc.file && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground truncate">
                         Selected: {additionalDoc.file.name}
                       </p>
                     )}
