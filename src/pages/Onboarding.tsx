@@ -23,12 +23,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Upload, User, Briefcase, FileText, Loader2, ShieldAlert, Calendar, Mail, Phone, MapPin } from "lucide-react";
+import { CheckCircle2, Upload, User, Briefcase, FileText, Loader2, ShieldAlert, Calendar, Mail, Phone, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDepartments } from "@/hooks/useEmployees";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // Fetch employees who are in onboarding status
 const useOnboardingEmployees = () => {
@@ -236,7 +247,61 @@ const Onboarding = () => {
     },
   });
 
-  // Show loading while checking role
+  const activateEmployeeMutation = useMutation({
+    mutationFn: async (employeeId: string) => {
+      // Update employee status to active
+      const { error: updateError } = await supabase
+        .from('employees')
+        .update({ status: 'active' })
+        .eq('id', employeeId);
+      
+      if (updateError) throw updateError;
+
+      // Initialize leave balances for the current year
+      const currentYear = new Date().getFullYear();
+      const { data: leaveTypes, error: leaveTypesError } = await supabase
+        .from('leave_types')
+        .select('id, days_per_year');
+      
+      if (leaveTypesError) throw leaveTypesError;
+
+      if (leaveTypes && leaveTypes.length > 0) {
+        const leaveBalances = leaveTypes.map(lt => ({
+          employee_id: employeeId,
+          leave_type_id: lt.id,
+          year: currentYear,
+          total_days: lt.days_per_year,
+          used_days: 0,
+        }));
+
+        const { error: balanceError } = await supabase
+          .from('leave_balances')
+          .upsert(leaveBalances, { onConflict: 'employee_id,leave_type_id,year' });
+        
+        if (balanceError) {
+          console.error('Failed to initialize leave balances:', balanceError);
+        }
+      }
+
+      return employeeId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['onboarding-employees'] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setSelectedEmployee(null);
+      toast({
+        title: "Employee Activated",
+        description: "Employee has been marked as active and leave balances have been initialized.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to activate employee.",
+        variant: "destructive",
+      });
+    },
+  });
   if (roleLoading) {
     return (
       <DashboardLayout>
@@ -711,7 +776,40 @@ const Onboarding = () => {
                   )}
                 </div>
                 
-                <Badge variant="secondary" className="w-fit">Onboarding</Badge>
+                <div className="flex items-center justify-between pt-2">
+                  <Badge variant="secondary">Onboarding</Badge>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        size="sm"
+                        disabled={activateEmployeeMutation.isPending}
+                      >
+                        {activateEmployeeMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                        )}
+                        Activate Employee
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Activate Employee</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will mark {selectedEmployee.first_name} {selectedEmployee.last_name} as an active employee and initialize their leave balances for the current year. Are you sure?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => activateEmployeeMutation.mutate(selectedEmployee.id)}
+                        >
+                          Activate
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
             )}
           </DialogContent>
