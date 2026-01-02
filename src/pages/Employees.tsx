@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { EmployeeTable, Employee } from "@/components/employees/EmployeeTable";
 import { Button } from "@/components/ui/button";
@@ -23,11 +24,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmployeeDocuments } from "@/components/documents/EmployeeDocuments";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
+import { EmployeeViewDialog } from "@/components/employees/EmployeeViewDialog";
+import { EmployeeEditDialog } from "@/components/employees/EmployeeEditDialog";
 
 const Employees = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [documentsEmployee, setDocumentsEmployee] = useState<Employee | null>(null);
+  const [viewEmployee, setViewEmployee] = useState<Employee | null>(null);
+  const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
 
   const { data: employees = [], isLoading: isLoadingEmployees } = useEmployees();
   const { data: departments = [] } = useDepartments();
@@ -131,9 +136,25 @@ const Employees = () => {
         ) : (
           <EmployeeTable 
             employees={filteredEmployees} 
+            onView={(employee) => setViewEmployee(employee)}
+            onEdit={isAdminOrHR ? (employee) => setEditEmployee(employee) : undefined}
             onManageDocuments={isAdminOrHR ? (employee) => setDocumentsEmployee(employee) : undefined}
           />
         )}
+
+        {/* View Profile Dialog */}
+        <EmployeeViewDialog 
+          employee={viewEmployee}
+          open={!!viewEmployee}
+          onOpenChange={(open) => !open && setViewEmployee(null)}
+        />
+
+        {/* Edit Employee Dialog */}
+        <EmployeeEditDialog 
+          employee={editEmployee}
+          open={!!editEmployee}
+          onOpenChange={(open) => !open && setEditEmployee(null)}
+        />
 
         {/* Documents Dialog */}
         <Dialog open={!!documentsEmployee} onOpenChange={(open) => !open && setDocumentsEmployee(null)}>
