@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { 
   Download,
   Settings,
@@ -10,7 +12,8 @@ import {
   CheckCircle,
   Database,
   Server,
-  Cloud
+  Cloud,
+  Sparkles
 } from "lucide-react";
 import hrHubLogo from "@/assets/hr-hub-logo.svg";
 
@@ -112,69 +115,103 @@ const HowItWorks = () => {
       </nav>
 
       {/* Hero */}
-      <section className="container mx-auto px-4 py-16 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">
-          How Peoplo Works
-        </h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-          Get your HR system up and running in four simple steps. No complex setup required.
-        </p>
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/5" />
+        <div className="container mx-auto px-4 py-20 lg:py-28 relative">
+          <div className="max-w-4xl mx-auto text-center space-y-6">
+            <Badge variant="secondary" className="px-4 py-1.5 text-sm font-medium">
+              <Sparkles className="h-3.5 w-3.5 mr-2" />
+              Simple Setup
+            </Badge>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-relaxed">
+              Get Started in{" "}
+              <span className="text-primary">Four Simple Steps</span>
+            </h1>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+              No complex setup required. Get your HR system up and running quickly 
+              with our streamlined onboarding process.
+            </p>
+          </div>
+        </div>
       </section>
 
-      {/* Steps */}
-      <section className="container mx-auto px-4 pb-16">
-        <div className="max-w-4xl mx-auto space-y-12">
-          {steps.map((step, index) => (
-            <div 
-              key={index}
-              className="flex flex-col md:flex-row gap-6 items-start"
-            >
-              <div className="flex-shrink-0">
-                <div className="h-16 w-16 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-xl">
-                  {step.number}
-                </div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                    {step.icon}
+      {/* Steps Timeline */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            {steps.map((step, index) => (
+              <div key={index} className="relative">
+                {/* Timeline connector */}
+                {index < steps.length - 1 && (
+                  <div className="absolute left-8 top-24 w-0.5 h-full bg-gradient-to-b from-primary/50 to-primary/10 hidden md:block" />
+                )}
+                
+                <div className={`flex flex-col md:flex-row gap-8 mb-16 ${index % 2 === 1 ? 'md:flex-row-reverse' : ''}`}>
+                  {/* Step Number & Icon */}
+                  <div className="flex-shrink-0 flex flex-col items-center md:items-start">
+                    <div className="relative">
+                      <div className="h-16 w-16 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-2xl shadow-lg">
+                        {step.number}
+                      </div>
+                      <div className="absolute -bottom-2 -right-2 h-10 w-10 rounded-xl bg-background border-2 border-primary/20 flex items-center justify-center text-primary">
+                        {step.icon}
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="text-2xl font-semibold">{step.title}</h3>
+                  
+                  {/* Content Card */}
+                  <Card className={`flex-1 hover:shadow-lg transition-all duration-300 hover:border-primary/30 ${index % 2 === 1 ? 'md:text-right' : ''}`}>
+                    <CardContent className="p-8">
+                      <h3 className="text-2xl md:text-3xl font-bold mb-3">{step.title}</h3>
+                      <p className="text-muted-foreground text-lg mb-6 leading-relaxed">
+                        {step.description}
+                      </p>
+                      <ul className={`space-y-3 ${index % 2 === 1 ? 'md:flex md:flex-col md:items-end' : ''}`}>
+                        {step.details.map((detail, detailIndex) => (
+                          <li 
+                            key={detailIndex} 
+                            className={`flex items-center gap-3 ${index % 2 === 1 ? 'md:flex-row-reverse' : ''}`}
+                          >
+                            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <CheckCircle className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="text-foreground">{detail}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
                 </div>
-                <p className="text-muted-foreground mb-4">{step.description}</p>
-                <ul className="space-y-2">
-                  {step.details.map((detail, detailIndex) => (
-                    <li key={detailIndex} className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
-                      <span>{detail}</span>
-                    </li>
-                  ))}
-                </ul>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Deployment Options */}
-      <section className="bg-muted/50 py-16">
+      <section className="bg-muted/30 py-20">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-4">Flexible Deployment</h2>
-          <p className="text-center text-muted-foreground mb-10 max-w-xl mx-auto">
-            Choose how you want to run Peoplo. Your data, your rules.
-          </p>
+          <div className="text-center mb-12">
+            <Badge variant="outline" className="mb-4">Deployment</Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Flexible Deployment Options</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Choose how you want to run Peoplo. Your data, your rules, your infrastructure.
+            </p>
+          </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {deployOptions.map((option, index) => (
-              <div 
+              <Card 
                 key={index}
-                className="p-6 rounded-xl border bg-card text-center"
+                className="text-center hover:shadow-lg transition-all duration-300 hover:border-primary/30"
               >
-                <div className="h-12 w-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
-                  {option.icon}
-                </div>
-                <h3 className="font-semibold mb-2">{option.title}</h3>
-                <p className="text-sm text-muted-foreground">{option.description}</p>
-              </div>
+                <CardContent className="p-8">
+                  <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-5">
+                    {option.icon}
+                  </div>
+                  <h3 className="font-semibold text-lg mb-3">{option.title}</h3>
+                  <p className="text-muted-foreground">{option.description}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
