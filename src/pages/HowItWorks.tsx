@@ -8,7 +8,6 @@ import {
   Users,
   Rocket,
   ArrowRight,
-  Github,
   CheckCircle,
   Database,
   Server,
@@ -16,6 +15,7 @@ import {
   Sparkles
 } from "lucide-react";
 import hrHubLogo from "@/assets/hr-hub-logo.svg";
+import Footer from "@/components/layout/Footer";
 
 const steps = [
   {
@@ -244,56 +244,7 @@ const HowItWorks = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t py-16 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-            <div className="col-span-2 md:col-span-1">
-              <Link to="/" className="flex items-center gap-2 mb-4">
-                <img src={hrHubLogo} alt="Peoplo" className="h-7 w-auto" />
-                <span className="font-bold text-lg">Peoplo</span>
-              </Link>
-              <p className="text-sm text-muted-foreground">
-                The complete HR platform for modern enterprises.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-sm">Product</h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li><Link to="/features" className="hover:text-foreground transition-colors">Features</Link></li>
-                <li><Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link></li>
-                <li><Link to="/how-it-works" className="hover:text-foreground transition-colors">How It Works</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-sm">Company</h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-sm">Legal</h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Security</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Peoplo. All rights reserved.
-            </p>
-            <div className="flex items-center gap-4">
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Github className="h-5 w-5" />
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 };
