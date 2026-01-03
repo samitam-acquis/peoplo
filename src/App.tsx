@@ -9,6 +9,9 @@ import Landing from "./pages/Landing";
 import Features from "./pages/Features";
 import HowItWorks from "./pages/HowItWorks";
 import Pricing from "./pages/Pricing";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
+import Security from "./pages/Security";
 import Index from "./pages/Index";
 import Employees from "./pages/Employees";
 import Onboarding from "./pages/Onboarding";
@@ -44,6 +47,9 @@ const App = () => (
             <Route path="/features" element={<Features />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/security" element={<Security />} />
             <Route path="/auth" element={<Auth />} />
             
             {/* Protected app pages */}
