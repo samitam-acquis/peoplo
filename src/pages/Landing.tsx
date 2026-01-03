@@ -179,7 +179,7 @@ const Landing = () => {
       {/* Stats Section */}
       <section className="border-y bg-muted/30">
         <div className="container mx-auto px-4 py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-3 gap-8 max-w-3xl mx-auto">
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-2">
