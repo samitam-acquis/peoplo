@@ -16,6 +16,7 @@ import Security from "./pages/Security";
 import Index from "./pages/Index";
 import Employees from "./pages/Employees";
 import Onboarding from "./pages/Onboarding";
+import OnboardingRequests from "./pages/OnboardingRequests";
 import Leaves from "./pages/Leaves";
 import LeaveApprovals from "./pages/LeaveApprovals";
 import Assets from "./pages/Assets";
@@ -57,6 +58,7 @@ const App = () => (
             <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
             <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+            <Route path="/onboarding-requests" element={<ProtectedRoute><OnboardingRequests /></ProtectedRoute>} />
             <Route path="/leaves" element={<ProtectedRoute><Leaves /></ProtectedRoute>} />
             <Route path="/leave-approvals" element={<ProtectedRoute><LeaveApprovals /></ProtectedRoute>} />
             <Route path="/assets" element={<ProtectedRoute><Assets /></ProtectedRoute>} />
