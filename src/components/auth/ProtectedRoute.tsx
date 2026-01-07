@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEmployeeStatus } from "@/hooks/useEmployeeStatus";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
@@ -48,7 +48,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           </CardHeader>
           <CardContent className="text-center">
             <Button asChild>
-              <a href="/dashboard">Go to Dashboard</a>
+              <Link to="/dashboard">Go to Dashboard</Link>
             </Button>
           </CardContent>
         </Card>
