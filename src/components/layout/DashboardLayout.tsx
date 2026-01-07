@@ -51,6 +51,7 @@ const navItems: NavItem[] = [
   { label: "Employees", href: "/employees", icon: <Users className="h-5 w-5" /> },
   { label: "Departments", href: "/departments", icon: <Building2 className="h-5 w-5" />, adminOnly: true },
   { label: "Onboarding", href: "/onboarding", icon: <UserPlus className="h-5 w-5" />, adminOnly: true },
+  { label: "Requests", href: "/onboarding-requests", icon: <ClipboardList className="h-5 w-5" />, adminOnly: true },
   { label: "Attendance", href: "/attendance", icon: <Clock className="h-5 w-5" /> },
   { label: "Calendar", href: "/calendar", icon: <CalendarDays className="h-5 w-5" /> },
   { label: "Leave Management", href: "/leaves", icon: <Calendar className="h-5 w-5" /> },
