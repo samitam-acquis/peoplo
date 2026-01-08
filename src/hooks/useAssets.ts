@@ -133,3 +133,52 @@ export function useCreateAsset() {
     },
   });
 }
+
+export interface UpdateAssetData {
+  id: string;
+  name?: string;
+  category?: string;
+  serial_number?: string;
+  purchase_date?: string;
+  purchase_cost?: number;
+  vendor?: string;
+  status?: "available" | "assigned" | "maintenance" | "retired";
+}
+
+export function useUpdateAsset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...data }: UpdateAssetData) => {
+      const { error } = await supabase
+        .from("assets")
+        .update(data)
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-stats"] });
+    },
+  });
+}
+
+export function useDeleteAsset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("assets")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-stats"] });
+    },
+  });
+}

@@ -18,10 +18,21 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Package, Laptop, Monitor, Smartphone } from "lucide-react";
-import { useAssets, useAssetStats, useCreateAsset } from "@/hooks/useAssets";
+import { useAssets, useAssetStats, useCreateAsset, useUpdateAsset, useDeleteAsset, type Asset } from "@/hooks/useAssets";
 import { toast } from "sonner";
 
 const Assets = () => {
@@ -29,6 +40,9 @@ const Assets = () => {
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     category: "laptop",
@@ -41,6 +55,8 @@ const Assets = () => {
   const { data: assets = [], isLoading } = useAssets();
   const { data: stats } = useAssetStats();
   const createAsset = useCreateAsset();
+  const updateAsset = useUpdateAsset();
+  const deleteAsset = useDeleteAsset();
 
   const filteredAssets = assets.filter((asset) => {
     const matchesSearch =
@@ -83,6 +99,66 @@ const Assets = () => {
         },
       }
     );
+  };
+
+  const handleEditAsset = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setFormData({
+      name: asset.name,
+      category: asset.type,
+      serial_number: asset.serialNumber,
+      purchase_date: "",
+      purchase_cost: asset.cost.toString(),
+      vendor: "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateAsset = () => {
+    if (!selectedAsset || !formData.name.trim()) {
+      toast.error("Asset name is required");
+      return;
+    }
+    updateAsset.mutate(
+      {
+        id: selectedAsset.id,
+        name: formData.name,
+        category: formData.category,
+        serial_number: formData.serial_number || undefined,
+        purchase_date: formData.purchase_date || undefined,
+        purchase_cost: formData.purchase_cost ? parseFloat(formData.purchase_cost) : undefined,
+        vendor: formData.vendor || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Asset updated successfully");
+          setIsEditDialogOpen(false);
+          setSelectedAsset(null);
+        },
+        onError: () => {
+          toast.error("Failed to update asset");
+        },
+      }
+    );
+  };
+
+  const handleDeleteAsset = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!selectedAsset) return;
+    deleteAsset.mutate(selectedAsset.id, {
+      onSuccess: () => {
+        toast.success("Asset deleted successfully");
+        setIsDeleteDialogOpen(false);
+        setSelectedAsset(null);
+      },
+      onError: () => {
+        toast.error("Failed to delete asset");
+      },
+    });
   };
 
   const assetStats = [
@@ -186,7 +262,12 @@ const Assets = () => {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredAssets.map((asset) => (
-              <AssetCard key={asset.id} asset={asset} />
+              <AssetCard 
+                key={asset.id} 
+                asset={asset} 
+                onEdit={handleEditAsset}
+                onDelete={handleDeleteAsset}
+              />
             ))}
           </div>
         )}
@@ -275,6 +356,112 @@ const Assets = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Asset Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Asset</DialogTitle>
+            <DialogDescription>Update the asset details below.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Asset Name *</Label>
+              <Input
+                id="edit-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., MacBook Pro 16"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-category">Category</Label>
+              <Select
+                value={formData.category}
+                onValueChange={(value) => setFormData({ ...formData, category: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="laptop">Laptop</SelectItem>
+                  <SelectItem value="monitor">Monitor</SelectItem>
+                  <SelectItem value="phone">Phone</SelectItem>
+                  <SelectItem value="accessory">Accessory</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-serial_number">Serial Number</Label>
+              <Input
+                id="edit-serial_number"
+                value={formData.serial_number}
+                onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                placeholder="e.g., ABC123XYZ"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-purchase_date">Purchase Date</Label>
+                <Input
+                  id="edit-purchase_date"
+                  type="date"
+                  value={formData.purchase_date}
+                  onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-purchase_cost">Cost</Label>
+                <Input
+                  id="edit-purchase_cost"
+                  type="number"
+                  value={formData.purchase_cost}
+                  onChange={(e) => setFormData({ ...formData, purchase_cost: e.target.value })}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-vendor">Vendor</Label>
+              <Input
+                id="edit-vendor"
+                value={formData.vendor}
+                onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
+                placeholder="e.g., Apple Store"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateAsset} disabled={updateAsset.isPending}>
+              {updateAsset.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Asset</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{selectedAsset?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteAsset.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
