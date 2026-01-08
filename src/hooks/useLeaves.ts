@@ -47,7 +47,7 @@ export function useLeaveRequests() {
           first_name,
           last_name,
           avatar_url,
-          department:departments(name)
+          department:departments!employees_department_id_fkey(name)
         `)
         .in("id", employeeIds);
 
