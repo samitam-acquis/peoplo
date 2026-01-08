@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,10 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Plus, Pencil, Trash2, Users } from "lucide-react";
 import { useDepartments, useCreateDepartment, useUpdateDepartment, useDeleteDepartment, Department } from "@/hooks/useDepartments";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -23,10 +26,24 @@ const Departments = () => {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
-  const [formData, setFormData] = useState({ name: "", description: "" });
+  const [formData, setFormData] = useState({ name: "", description: "", manager_id: "" });
+
+  // Fetch employees for manager selection
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees-for-manager"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("id, first_name, last_name")
+        .eq("status", "active")
+        .order("first_name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   const resetForm = () => {
-    setFormData({ name: "", description: "" });
+    setFormData({ name: "", description: "", manager_id: "" });
     setEditingDepartment(null);
   };
 
@@ -40,6 +57,7 @@ const Departments = () => {
       await createDepartment.mutateAsync({
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
+        manager_id: formData.manager_id || null,
       });
       toast.success("Department created successfully");
       setIsCreateOpen(false);
@@ -60,6 +78,7 @@ const Departments = () => {
         id: editingDepartment.id,
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
+        manager_id: formData.manager_id || null,
       });
       toast.success("Department updated successfully");
       setEditingDepartment(null);
@@ -83,6 +102,7 @@ const Departments = () => {
     setFormData({
       name: department.name,
       description: department.description || "",
+      manager_id: department.manager_id || "",
     });
   };
 
@@ -125,6 +145,25 @@ const Departments = () => {
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="manager">Department Head</Label>
+                  <Select
+                    value={formData.manager_id}
+                    onValueChange={(value) => setFormData({ ...formData, manager_id: value === "none" ? "" : value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select department head" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Manager</SelectItem>
+                      {employees.map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.first_name} {emp.last_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <DialogFooter>
@@ -191,6 +230,7 @@ const Departments = () => {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Description</TableHead>
+                      <TableHead>Department Head</TableHead>
                       <TableHead>Employees</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -202,6 +242,9 @@ const Departments = () => {
                         <TableCell className="font-medium">{department.name}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {department.description || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {department.manager_name || <span className="text-muted-foreground">-</span>}
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary">{department.employee_count}</Badge>
@@ -251,6 +294,25 @@ const Departments = () => {
                                         setFormData({ ...formData, description: e.target.value })
                                       }
                                     />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="edit-manager">Department Head</Label>
+                                    <Select
+                                      value={formData.manager_id}
+                                      onValueChange={(value) => setFormData({ ...formData, manager_id: value === "none" ? "" : value })}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select department head" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">No Manager</SelectItem>
+                                        {employees.map((emp) => (
+                                          <SelectItem key={emp.id} value={emp.id}>
+                                            {emp.first_name} {emp.last_name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
                                   </div>
                                 </div>
                                 <DialogFooter>
