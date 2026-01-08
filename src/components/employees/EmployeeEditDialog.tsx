@@ -35,6 +35,7 @@ interface EditFormData {
   phone: string;
   designation: string;
   department_id: string;
+  manager_id: string;
   status: string;
 }
 
@@ -47,6 +48,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
     phone: "",
     designation: "",
     department_id: "",
+    manager_id: "",
     status: "active",
   });
 
@@ -65,6 +67,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
           phone,
           designation,
           department_id,
+          manager_id,
           status
         `)
         .eq("id", employee.id)
@@ -74,6 +77,20 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
       return data;
     },
     enabled: open && !!employee?.id,
+  });
+
+  // Fetch managers (active employees who can be managers)
+  const { data: managers = [] } = useQuery({
+    queryKey: ["managers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("id, first_name, last_name")
+        .eq("status", "active")
+        .order("first_name");
+      if (error) throw error;
+      return data || [];
+    },
   });
 
   // Fetch departments
@@ -99,6 +116,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
         phone: employeeDetails.phone || "",
         designation: employeeDetails.designation || "",
         department_id: employeeDetails.department_id || "",
+        manager_id: employeeDetails.manager_id || "",
         status: employeeDetails.status || "active",
       });
     }
@@ -115,6 +133,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
           phone: data.phone || null,
           designation: data.designation,
           department_id: data.department_id || null,
+          manager_id: data.manager_id || null,
           status: data.status as "active" | "inactive" | "onboarding" | "offboarded",
         })
         .eq("id", employee?.id);
@@ -220,6 +239,28 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                       {dept.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="manager">Reporting Manager</Label>
+              <Select
+                value={formData.manager_id}
+                onValueChange={(value) => setFormData({ ...formData, manager_id: value === "none" ? "" : value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select manager" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Manager</SelectItem>
+                  {managers
+                    .filter((mgr) => mgr.id !== employee?.id)
+                    .map((mgr) => (
+                      <SelectItem key={mgr.id} value={mgr.id}>
+                        {mgr.first_name} {mgr.last_name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
