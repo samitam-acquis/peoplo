@@ -2,11 +2,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Laptop, Monitor, Smartphone, Headphones, MoreVertical } from "lucide-react";
+import { Laptop, Monitor, Smartphone, Headphones, MoreVertical, Edit, Trash2, UserPlus, RotateCcw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -29,6 +30,7 @@ interface AssetCardProps {
   onAssign?: (asset: Asset) => void;
   onReturn?: (asset: Asset) => void;
   onEdit?: (asset: Asset) => void;
+  onDelete?: (asset: Asset) => void;
 }
 
 const typeIcons = {
@@ -44,7 +46,7 @@ const statusStyles = {
   maintenance: "bg-amber-500/10 text-amber-600 border-amber-500/20",
 };
 
-export function AssetCard({ asset, onAssign, onReturn, onEdit }: AssetCardProps) {
+export function AssetCard({ asset, onAssign, onReturn, onEdit, onDelete }: AssetCardProps) {
   return (
     <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg">
       <CardContent className="p-6">
@@ -65,17 +67,30 @@ export function AssetCard({ asset, onAssign, onReturn, onEdit }: AssetCardProps)
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit?.(asset)}>Edit Asset</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit?.(asset)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Asset
+              </DropdownMenuItem>
               {asset.status === "available" && (
                 <DropdownMenuItem onClick={() => onAssign?.(asset)}>
+                  <UserPlus className="mr-2 h-4 w-4" />
                   Assign to Employee
                 </DropdownMenuItem>
               )}
               {asset.status === "assigned" && (
                 <DropdownMenuItem onClick={() => onReturn?.(asset)}>
+                  <RotateCcw className="mr-2 h-4 w-4" />
                   Mark as Returned
                 </DropdownMenuItem>
               )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => onDelete?.(asset)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Asset
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
