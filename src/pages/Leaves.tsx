@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader as ModalHeader, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, Plus, Clock, CheckCircle, XCircle, ArrowUpDown } from "lucide-react";
+import { Calendar, Plus, Clock, CheckCircle, XCircle, ArrowUpDown, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { usePagination } from "@/hooks/usePagination";
 import { useSorting } from "@/hooks/useSorting";
 import {
@@ -39,6 +39,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useLeaveRequests, useLeaveStats, useUpdateLeaveStatus } from "@/hooks/useLeaves";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const Leaves = () => {
   const { user } = useAuth();
@@ -109,6 +111,69 @@ const Leaves = () => {
         },
       }
     );
+  };
+
+  const exportToCSV = () => {
+    const allRequests = [...pendingRequests, ...processedRequests];
+    const headers = ["Employee", "Department", "Type", "Start Date", "End Date", "Days", "Status", "Reason"];
+    const csvContent = [
+      headers.join(","),
+      ...allRequests.map((req) =>
+        [
+          `"${req.employee.name}"`,
+          `"${req.employee.department}"`,
+          `"${req.type}"`,
+          `"${req.startDate}"`,
+          `"${req.endDate}"`,
+          `"${req.days}"`,
+          `"${req.status}"`,
+          `"${req.reason || ''}"`,
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `leave-requests-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    toast({
+      title: "Export Complete",
+      description: "Leave requests exported to CSV",
+    });
+  };
+
+  const exportToPDF = () => {
+    const allRequests = [...pendingRequests, ...processedRequests];
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text("Leave Requests Report", 14, 22);
+    doc.setFontSize(10);
+    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 30);
+    doc.text(`Total Requests: ${allRequests.length} | Pending: ${pendingRequests.length} | Processed: ${processedRequests.length}`, 14, 36);
+
+    autoTable(doc, {
+      startY: 44,
+      head: [["Employee", "Department", "Type", "Start Date", "End Date", "Days", "Status"]],
+      body: allRequests.map((req) => [
+        req.employee.name,
+        req.employee.department,
+        req.type,
+        req.startDate,
+        req.endDate,
+        req.days.toString(),
+        req.status,
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [59, 130, 246] },
+    });
+
+    doc.save(`leave-requests-${new Date().toISOString().split("T")[0]}.pdf`);
+    toast({
+      title: "Export Complete",
+      description: "Leave requests exported to PDF",
+    });
   };
 
   const pendingRequests = requests.filter((r) => r.status === "pending");
@@ -243,13 +308,32 @@ const Leaves = () => {
             <h2 className="text-2xl font-bold text-foreground">Leave Management</h2>
             <p className="text-muted-foreground">Manage and track leave requests</p>
           </div>
-          <Dialog open={isNewRequestOpen} onOpenChange={setIsNewRequestOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                New Leave Request
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={exportToCSV}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportToPDF}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Export as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Dialog open={isNewRequestOpen} onOpenChange={setIsNewRequestOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Leave Request
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <ModalHeader>
                 <ModalTitle>New Leave Request</ModalTitle>
@@ -267,6 +351,7 @@ const Leaves = () => {
               )}
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {/* Stats */}
