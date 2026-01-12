@@ -7,6 +7,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, LogIn, LogOut, Calendar, Download } from "lucide-react";
+import { usePagination } from "@/hooks/usePagination";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { useAttendance, useTodayAttendance, useClockIn, useClockOut, useAttendanceReport } from "@/hooks/useAttendance";
 import { useAuth } from "@/contexts/AuthContext";
@@ -69,6 +79,12 @@ const Attendance = () => {
     },
     enabled: !!user,
   });
+
+  // Pagination for report data
+  const reportPagination = usePagination(reportData || [], { initialPageSize: 10 });
+  
+  // Pagination for attendance history
+  const historyPagination = usePagination(attendanceRecords || [], { initialPageSize: 10 });
 
   const handleClockIn = async () => {
     if (!currentEmployee) {
@@ -257,6 +273,7 @@ const Attendance = () => {
             {reportLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : reportData && reportData.length > 0 ? (
+              <>
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -270,7 +287,7 @@ const Attendance = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reportData.map((emp) => (
+                    {reportPagination.paginatedItems.map((emp) => (
                       <TableRow key={emp.employeeId}>
                         <TableCell className="font-medium">{emp.employeeCode}</TableCell>
                         <TableCell>{emp.employeeName}</TableCell>
@@ -285,6 +302,74 @@ const Attendance = () => {
                   </TableBody>
                 </Table>
               </div>
+              {/* Pagination for report */}
+              {reportPagination.totalPages > 1 && (
+                <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Show</span>
+                    <Select value={reportPagination.pageSize.toString()} onValueChange={(v) => reportPagination.setPageSize(Number(v))}>
+                      <SelectTrigger className="h-8 w-[70px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[5, 10, 20, 50].map((size) => (
+                          <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span>of {reportPagination.totalItems} records</span>
+                  </div>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => reportPagination.canGoPrevious && reportPagination.goToPreviousPage()}
+                          className={!reportPagination.canGoPrevious ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      {(() => {
+                        const pages: (number | "ellipsis")[] = [];
+                        const { currentPage, totalPages } = reportPagination;
+                        if (totalPages <= 7) {
+                          for (let i = 1; i <= totalPages; i++) pages.push(i);
+                        } else {
+                          pages.push(1);
+                          if (currentPage > 3) pages.push("ellipsis");
+                          for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                            pages.push(i);
+                          }
+                          if (currentPage < totalPages - 2) pages.push("ellipsis");
+                          pages.push(totalPages);
+                        }
+                        return pages.map((page, idx) =>
+                          page === "ellipsis" ? (
+                            <PaginationItem key={`ellipsis-${idx}`}>
+                              <PaginationEllipsis />
+                            </PaginationItem>
+                          ) : (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => reportPagination.setPage(page)}
+                                isActive={reportPagination.currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          )
+                        );
+                      })()}
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => reportPagination.canGoNext && reportPagination.goToNextPage()}
+                          className={!reportPagination.canGoNext ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+              </>
             ) : (
               <div className="flex h-32 items-center justify-center text-muted-foreground">
                 No attendance records for this period
@@ -303,6 +388,7 @@ const Attendance = () => {
             {recordsLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : attendanceRecords && attendanceRecords.length > 0 ? (
+            <>
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -315,7 +401,7 @@ const Attendance = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {attendanceRecords.map((record) => (
+                    {historyPagination.paginatedItems.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>{format(new Date(record.date), "MMM d, yyyy")}</TableCell>
                         <TableCell>
@@ -333,6 +419,74 @@ const Attendance = () => {
                   </TableBody>
                 </Table>
               </div>
+              {/* Pagination for history */}
+              {historyPagination.totalPages > 1 && (
+                <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Show</span>
+                    <Select value={historyPagination.pageSize.toString()} onValueChange={(v) => historyPagination.setPageSize(Number(v))}>
+                      <SelectTrigger className="h-8 w-[70px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[5, 10, 20, 50].map((size) => (
+                          <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span>of {historyPagination.totalItems} records</span>
+                  </div>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => historyPagination.canGoPrevious && historyPagination.goToPreviousPage()}
+                          className={!historyPagination.canGoPrevious ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      {(() => {
+                        const pages: (number | "ellipsis")[] = [];
+                        const { currentPage, totalPages } = historyPagination;
+                        if (totalPages <= 7) {
+                          for (let i = 1; i <= totalPages; i++) pages.push(i);
+                        } else {
+                          pages.push(1);
+                          if (currentPage > 3) pages.push("ellipsis");
+                          for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                            pages.push(i);
+                          }
+                          if (currentPage < totalPages - 2) pages.push("ellipsis");
+                          pages.push(totalPages);
+                        }
+                        return pages.map((page, idx) =>
+                          page === "ellipsis" ? (
+                            <PaginationItem key={`ellipsis-${idx}`}>
+                              <PaginationEllipsis />
+                            </PaginationItem>
+                          ) : (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => historyPagination.setPage(page)}
+                                isActive={historyPagination.currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          )
+                        );
+                      })()}
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => historyPagination.canGoNext && historyPagination.goToNextPage()}
+                          className={!historyPagination.canGoNext ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+              </>
             ) : (
               <div className="flex h-32 items-center justify-center text-muted-foreground">
                 No attendance records found
