@@ -10,6 +10,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, Plus, Clock, CheckCircle, XCircle } from "lucide-react";
+import { usePagination } from "@/hooks/usePagination";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,11 +107,88 @@ const Leaves = () => {
   const pendingRequests = requests.filter((r) => r.status === "pending");
   const processedRequests = requests.filter((r) => r.status !== "pending");
 
+  const pendingPagination = usePagination(pendingRequests, { initialPageSize: 10 });
+  const processedPagination = usePagination(processedRequests, { initialPageSize: 10 });
+
   const leaveStats = [
     { label: "Pending", value: stats?.pending || 0, icon: <Clock className="h-5 w-5" />, color: "text-amber-600" },
     { label: "Approved", value: stats?.approved || 0, icon: <CheckCircle className="h-5 w-5" />, color: "text-emerald-600" },
     { label: "Rejected", value: stats?.rejected || 0, icon: <XCircle className="h-5 w-5" />, color: "text-destructive" },
   ];
+
+  const renderPaginationControls = (pagination: ReturnType<typeof usePagination>) => {
+    if (pagination.totalPages <= 1) return null;
+    
+    const getPageNumbers = () => {
+      const pages: (number | "ellipsis")[] = [];
+      const { currentPage, totalPages } = pagination;
+      
+      if (totalPages <= 7) {
+        for (let i = 1; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        if (currentPage > 3) pages.push("ellipsis");
+        for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+          pages.push(i);
+        }
+        if (currentPage < totalPages - 2) pages.push("ellipsis");
+        pages.push(totalPages);
+      }
+      return pages;
+    };
+
+    return (
+      <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Show</span>
+          <Select value={pagination.pageSize.toString()} onValueChange={(v) => pagination.setPageSize(Number(v))}>
+            <SelectTrigger className="h-8 w-[70px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[5, 10, 20, 50].map((size) => (
+                <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span>of {pagination.totalItems} requests</span>
+        </div>
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => pagination.canGoPrevious && pagination.goToPreviousPage()}
+                className={!pagination.canGoPrevious ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              />
+            </PaginationItem>
+            {getPageNumbers().map((page, idx) =>
+              page === "ellipsis" ? (
+                <PaginationItem key={`ellipsis-${idx}`}>
+                  <PaginationEllipsis />
+                </PaginationItem>
+              ) : (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={() => pagination.setPage(page)}
+                    isActive={pagination.currentPage === page}
+                    className="cursor-pointer"
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              )
+            )}
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => pagination.canGoNext && pagination.goToNextPage()}
+                className={!pagination.canGoNext ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
+    );
+  };
 
   return (
     <DashboardLayout>
@@ -177,14 +271,17 @@ const Leaves = () => {
                 </CardContent>
               </Card>
             ) : (
-              pendingRequests.map((request) => (
-                <LeaveRequestCard
-                  key={request.id}
-                  request={request}
-                  onApprove={canApproveLeaves ? handleApprove : undefined}
-                  onReject={canApproveLeaves ? handleReject : undefined}
-                />
-              ))
+              <>
+                {pendingPagination.paginatedItems.map((request) => (
+                  <LeaveRequestCard
+                    key={request.id}
+                    request={request}
+                    onApprove={canApproveLeaves ? handleApprove : undefined}
+                    onReject={canApproveLeaves ? handleReject : undefined}
+                  />
+                ))}
+                {renderPaginationControls(pendingPagination)}
+              </>
             )}
           </TabsContent>
 
@@ -204,9 +301,12 @@ const Leaves = () => {
                 </CardContent>
               </Card>
             ) : (
-              processedRequests.map((request) => (
-                <LeaveRequestCard key={request.id} request={request} />
-              ))
+              <>
+                {processedPagination.paginatedItems.map((request) => (
+                  <LeaveRequestCard key={request.id} request={request} />
+                ))}
+                {renderPaginationControls(processedPagination)}
+              </>
             )}
           </TabsContent>
 

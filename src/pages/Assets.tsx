@@ -33,6 +33,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Package, Laptop, Monitor, Smartphone } from "lucide-react";
+import { usePagination } from "@/hooks/usePagination";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { useAssets, useAssetStats, useCreateAsset, useUpdateAsset, useDeleteAsset, useAssignAsset, useReturnAsset, useAssetHistory, type Asset } from "@/hooks/useAssets";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +91,20 @@ const Assets = () => {
     const matchesStatus = statusFilter === "all" || asset.status === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  const {
+    paginatedItems: paginatedAssets,
+    currentPage,
+    totalPages,
+    totalItems,
+    setPage,
+    setPageSize,
+    pageSize,
+    goToNextPage,
+    goToPreviousPage,
+    canGoNext,
+    canGoPrevious,
+  } = usePagination(filteredAssets, { initialPageSize: 12 });
 
   const handleAddAsset = () => {
     if (!formData.name.trim()) {
@@ -329,19 +353,88 @@ const Assets = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredAssets.map((asset) => (
-              <AssetCard 
-                key={asset.id} 
-                asset={asset} 
-                onEdit={handleEditAsset}
-                onDelete={handleDeleteAsset}
-                onAssign={handleAssignAsset}
-                onReturn={handleReturnAsset}
-                onViewHistory={handleViewHistory}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {paginatedAssets.map((asset) => (
+                <AssetCard 
+                  key={asset.id} 
+                  asset={asset} 
+                  onEdit={handleEditAsset}
+                  onDelete={handleDeleteAsset}
+                  onAssign={handleAssignAsset}
+                  onReturn={handleReturnAsset}
+                  onViewHistory={handleViewHistory}
+                />
+              ))}
+            </div>
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="mt-6 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Show</span>
+                  <Select value={pageSize.toString()} onValueChange={(v) => setPageSize(Number(v))}>
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[6, 12, 24, 48].map((size) => (
+                        <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span>of {totalItems} assets</span>
+                </div>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => canGoPrevious && goToPreviousPage()}
+                        className={!canGoPrevious ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                    {(() => {
+                      const pages: (number | "ellipsis")[] = [];
+                      if (totalPages <= 7) {
+                        for (let i = 1; i <= totalPages; i++) pages.push(i);
+                      } else {
+                        pages.push(1);
+                        if (currentPage > 3) pages.push("ellipsis");
+                        for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                          pages.push(i);
+                        }
+                        if (currentPage < totalPages - 2) pages.push("ellipsis");
+                        pages.push(totalPages);
+                      }
+                      return pages.map((page, idx) =>
+                        page === "ellipsis" ? (
+                          <PaginationItem key={`ellipsis-${idx}`}>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        ) : (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => setPage(page)}
+                              isActive={currentPage === page}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      );
+                    })()}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => canGoNext && goToNextPage()}
+                        className={!canGoNext ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </>
         )}
       </div>
 
