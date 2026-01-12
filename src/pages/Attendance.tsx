@@ -6,7 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, LogIn, LogOut, Calendar, Download } from "lucide-react";
+import { Clock, LogIn, LogOut, Calendar, Download, FileSpreadsheet, FileText } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { usePagination } from "@/hooks/usePagination";
 import { useSorting } from "@/hooks/useSorting";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
@@ -122,6 +128,33 @@ const Attendance = () => {
     }
   };
 
+  const exportToCSV = () => {
+    if (!reportData || reportData.length === 0) return;
+
+    const monthName = MONTHS[parseInt(selectedMonth)].label;
+    const headers = ["Employee Code", "Name", "Department", "Present Days", "Total Hours", "Avg Hours/Day"];
+    const csvContent = [
+      headers.join(","),
+      ...reportData.map((emp) =>
+        [
+          `"${emp.employeeCode}"`,
+          `"${emp.employeeName}"`,
+          `"${emp.department}"`,
+          `"${emp.presentDays}"`,
+          `"${emp.totalHours.toFixed(2)}"`,
+          `"${emp.totalDays > 0 ? (emp.totalHours / emp.totalDays).toFixed(2) : "0"}"`,
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `attendance-report-${monthName.toLowerCase()}-${selectedYear}.csv`;
+    link.click();
+    toast.success("Attendance report exported to CSV");
+  };
+
   const exportToPDF = () => {
     if (!reportData || reportData.length === 0) return;
 
@@ -154,6 +187,7 @@ const Attendance = () => {
     });
 
     doc.save(`attendance-report-${monthName.toLowerCase()}-${selectedYear}.pdf`);
+    toast.success("Attendance report exported to PDF");
   };
 
   const currentTime = new Date();
@@ -272,10 +306,24 @@ const Attendance = () => {
                 </CardDescription>
               </div>
             </div>
-            <Button onClick={exportToPDF} disabled={reportLoading || !reportData?.length}>
-              <Download className="mr-2 h-4 w-4" />
-              Export PDF
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={reportLoading || !reportData?.length}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={exportToCSV}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportToPDF}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Export as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </CardHeader>
           <CardContent>
             {reportLoading ? (

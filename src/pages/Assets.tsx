@@ -32,7 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Package, Laptop, Monitor, Smartphone, ArrowUpDown } from "lucide-react";
+import { Plus, Search, Package, Laptop, Monitor, Smartphone, ArrowUpDown, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { usePagination } from "@/hooks/usePagination";
 import { useSorting } from "@/hooks/useSorting";
 import {
@@ -40,6 +40,12 @@ import {
   DropdownMenuContent as SortDropdownMenuContent,
   DropdownMenuItem as SortDropdownMenuItem,
   DropdownMenuTrigger as SortDropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Pagination,
@@ -56,6 +62,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEmployees } from "@/hooks/useEmployees";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const Assets = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -126,6 +134,58 @@ const Assets = () => {
     canGoNext,
     canGoPrevious,
   } = usePagination(sortedAssets, { initialPageSize: 12 });
+
+  const exportToCSV = () => {
+    const headers = ["Name", "Category", "Serial Number", "Status", "Cost", "Assigned To"];
+    const csvContent = [
+      headers.join(","),
+      ...sortedAssets.map((asset) =>
+        [
+          `"${asset.name}"`,
+          `"${asset.type}"`,
+          `"${asset.serialNumber}"`,
+          `"${asset.status}"`,
+          `"${asset.cost}"`,
+          `"${asset.assignedTo?.name || 'Unassigned'}"`,
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `assets-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    toast.success("Assets exported to CSV");
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text("Asset Inventory", 14, 22);
+    doc.setFontSize(10);
+    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 30);
+    doc.text(`Total Assets: ${sortedAssets.length}`, 14, 36);
+
+    autoTable(doc, {
+      startY: 44,
+      head: [["Name", "Category", "Serial Number", "Status", "Cost", "Assigned To"]],
+      body: sortedAssets.map((asset) => [
+        asset.name,
+        asset.type,
+        asset.serialNumber,
+        asset.status,
+        `₹${asset.cost.toLocaleString()}`,
+        asset.assignedTo?.name || "Unassigned",
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [59, 130, 246] },
+    });
+
+    doc.save(`assets-${new Date().toISOString().split("T")[0]}.pdf`);
+    toast.success("Assets exported to PDF");
+  };
 
   const handleAddAsset = () => {
     if (!formData.name.trim()) {
@@ -291,10 +351,30 @@ const Assets = () => {
             <h2 className="text-2xl font-bold text-foreground">Asset Management</h2>
             <p className="text-muted-foreground">Track and manage company assets</p>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Asset
-          </Button>
+          <div className="flex gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={exportToCSV}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportToPDF}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Export as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Asset
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
