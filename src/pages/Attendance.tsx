@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, LogIn, LogOut, Calendar, Briefcase } from "lucide-react";
+import { Clock, LogIn, LogOut, Calendar, Briefcase, Timer } from "lucide-react";
 import { usePagination } from "@/hooks/usePagination";
 import { useSorting } from "@/hooks/useSorting";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
@@ -103,6 +103,29 @@ const Attendance = () => {
   const isWorkingDay = (days: number[] | null): boolean => {
     const today = new Date().getDay();
     return (days || [1, 2, 3, 4, 5]).includes(today);
+  };
+
+  // Calculate overtime for a record based on configured working hours
+  const calculateOvertime = (record: { clock_in: string | null; clock_out: string | null; total_hours: number | null }): number => {
+    if (!currentEmployee || !record.clock_out || !record.total_hours) return 0;
+    
+    const workEnd = currentEmployee.working_hours_end || "18:00:00";
+    const workStart = currentEmployee.working_hours_start || "09:00:00";
+    
+    // Calculate expected hours from schedule
+    const [startHour, startMin] = workStart.split(':').map(Number);
+    const [endHour, endMin] = workEnd.split(':').map(Number);
+    const expectedHours = (endHour + endMin / 60) - (startHour + startMin / 60);
+    
+    // Overtime is hours worked beyond expected hours
+    const overtime = record.total_hours - expectedHours;
+    return overtime > 0 ? overtime : 0;
+  };
+
+  // Calculate total overtime for the month
+  const calculateMonthlyOvertime = (): number => {
+    if (!attendanceRecords) return 0;
+    return attendanceRecords.reduce((total, record) => total + calculateOvertime(record), 0);
   };
 
   // Sorting for report data
@@ -547,9 +570,20 @@ const Attendance = () => {
 
         {/* My Attendance History */}
         <Card>
-          <CardHeader>
-            <CardTitle>My Attendance History</CardTitle>
-            <CardDescription>Your attendance records for {MONTHS[parseInt(selectedMonth)].label}</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>My Attendance History</CardTitle>
+              <CardDescription>Your attendance records for {MONTHS[parseInt(selectedMonth)].label}</CardDescription>
+            </div>
+            {attendanceRecords && attendanceRecords.length > 0 && (
+              <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
+                <Timer className="h-4 w-4 text-orange-500" />
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Monthly Overtime: </span>
+                  <span className="font-semibold text-orange-600">{calculateMonthlyOvertime().toFixed(2)} hrs</span>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {recordsLoading ? (
@@ -578,6 +612,7 @@ const Attendance = () => {
                       >
                         Total Hours
                       </SortableTableHead>
+                      <TableHead>Overtime</TableHead>
                       <SortableTableHead
                         sortKey="status"
                         currentSortKey={historySorting.sortConfig.key as string | null}
@@ -589,21 +624,33 @@ const Attendance = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {historyPagination.paginatedItems.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell>{format(new Date(record.date), "MMM d, yyyy")}</TableCell>
-                        <TableCell>
-                          {record.clock_in ? format(new Date(record.clock_in), "hh:mm a") : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {record.clock_out ? format(new Date(record.clock_out), "hh:mm a") : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {record.total_hours ? `${record.total_hours.toFixed(2)} hrs` : "-"}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(record.status)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {historyPagination.paginatedItems.map((record) => {
+                      const overtime = calculateOvertime(record);
+                      return (
+                        <TableRow key={record.id}>
+                          <TableCell>{format(new Date(record.date), "MMM d, yyyy")}</TableCell>
+                          <TableCell>
+                            {record.clock_in ? format(new Date(record.clock_in), "hh:mm a") : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {record.clock_out ? format(new Date(record.clock_out), "hh:mm a") : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {record.total_hours ? `${record.total_hours.toFixed(2)} hrs` : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {overtime > 0 ? (
+                              <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">
+                                +{overtime.toFixed(2)} hrs
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(record.status)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
