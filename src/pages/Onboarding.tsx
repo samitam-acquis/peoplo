@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle2, Upload, User, Briefcase, FileText, Loader2, ShieldAlert, Calendar, Mail, Phone, MapPin, Pencil, X, Check, Download, ExternalLink } from "lucide-react";
+import { CheckCircle2, Upload, User, Briefcase, FileText, Loader2, ShieldAlert, Calendar, Mail, Phone, MapPin, Pencil, X, Check, Download, ExternalLink, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDepartments } from "@/hooks/useEmployees";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -60,6 +60,7 @@ const useOnboardingEmployees = () => {
           designation,
           department_id,
           manager_id,
+          user_id,
           departments (name)
         `)
         .eq('status', 'onboarding');
@@ -221,6 +222,7 @@ const Onboarding = () => {
   const [documents, setDocuments] = useState<Record<string, DocumentUpload>>(initialDocuments);
   const [additionalDoc, setAdditionalDoc] = useState<{ file: File | null; type: string }>({ file: null, type: '' });
   const [isUploadingAdditional, setIsUploadingAdditional] = useState(false);
+  const [resendingInvite, setResendingInvite] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isAdminOrHR, isLoading: roleLoading } = useIsAdminOrHR();
@@ -551,6 +553,54 @@ const Onboarding = () => {
       });
     },
   });
+
+  // Resend invite handler
+  const handleResendInvite = async (employee: any) => {
+    setResendingInvite(employee.id);
+    try {
+      const selectedDept = departments.find(d => d.id === employee.department_id);
+      
+      const { data: inviteResult, error: inviteError } = await supabase.functions.invoke("invite-employee", {
+        body: {
+          email: employee.email,
+          first_name: employee.first_name,
+          last_name: employee.last_name,
+          designation: employee.designation || '',
+          department_name: selectedDept?.name,
+          redirect_url: `${window.location.origin}/`,
+        }
+      });
+
+      if (inviteError) {
+        throw new Error(inviteError.message || 'Failed to resend invite');
+      }
+
+      // Update employee user_id if not already linked
+      if (inviteResult?.user_id && !employee.user_id) {
+        await supabase
+          .from('employees')
+          .update({ user_id: inviteResult.user_id })
+          .eq('id', employee.id);
+        
+        queryClient.invalidateQueries({ queryKey: ['onboarding-employees'] });
+      }
+
+      toast({
+        title: "Invite Sent",
+        description: inviteResult?.already_exists 
+          ? `${employee.first_name} already has an account. No new invite needed.`
+          : `A new invitation email has been sent to ${employee.email}.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to resend invite.",
+        variant: "destructive",
+      });
+    } finally {
+      setResendingInvite(null);
+    }
+  };
 
   const openEditMode = (employee: any) => {
     setEditFormData({
@@ -1038,8 +1088,22 @@ const Onboarding = () => {
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                             <Badge variant="secondary">Onboarding</Badge>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleResendInvite(employee)}
+                              disabled={resendingInvite === employee.id}
+                              title="Resend login invitation email"
+                            >
+                              {resendingInvite === employee.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Send className="mr-2 h-4 w-4" />
+                              )}
+                              {resendingInvite === employee.id ? 'Sending...' : 'Resend Invite'}
+                            </Button>
                             <Button 
                               variant="outline" 
                               size="sm"
