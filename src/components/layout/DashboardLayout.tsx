@@ -188,23 +188,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </Button>
             <div>
               <h1 className="text-lg font-semibold text-foreground lg:text-xl">
-                {navItems.find((item) => item.href === location.pathname)?.label || "Dashboard"}
+                {new Date().toLocaleDateString("en-US", { weekday: "long" })}
               </h1>
               <p className="text-sm text-muted-foreground">
-                <span className="hidden sm:inline">
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </span>
-                <span className="sm:hidden">
-                  {new Date().toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </span>
+                {new Date().toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
               </p>
             </div>
           </div>
