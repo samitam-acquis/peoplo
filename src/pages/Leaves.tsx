@@ -60,6 +60,8 @@ const Leaves = () => {
   // Processed tab filters
   const [processedStatusFilter, setProcessedStatusFilter] = useState<"all" | "approved" | "rejected">("all");
   const [processedTypeFilter, setProcessedTypeFilter] = useState<string>("all");
+  const [processedMonthFilter, setProcessedMonthFilter] = useState<string>("all");
+  const [processedYearFilter, setProcessedYearFilter] = useState<string>("all");
   
   const canApproveLeaves = isAdminOrHR || roles.includes("manager");
 
@@ -273,11 +275,32 @@ const Leaves = () => {
   // Get unique leave types for filter
   const uniqueLeaveTypes = [...new Set(allProcessedRequests.map((r) => r.type))];
   
+  // Get unique years for filter
+  const uniqueYears = [...new Set(allProcessedRequests.map((r) => parseISO(r.startDate).getFullYear()))].sort((a, b) => b - a);
+  
+  const MONTHS = [
+    { value: "0", label: "January" },
+    { value: "1", label: "February" },
+    { value: "2", label: "March" },
+    { value: "3", label: "April" },
+    { value: "4", label: "May" },
+    { value: "5", label: "June" },
+    { value: "6", label: "July" },
+    { value: "7", label: "August" },
+    { value: "8", label: "September" },
+    { value: "9", label: "October" },
+    { value: "10", label: "November" },
+    { value: "11", label: "December" },
+  ];
+  
   // Apply filters to processed requests
   const processedRequests = allProcessedRequests.filter((r) => {
     const statusMatch = processedStatusFilter === "all" || r.status === processedStatusFilter;
     const typeMatch = processedTypeFilter === "all" || r.type === processedTypeFilter;
-    return statusMatch && typeMatch;
+    const leaveDate = parseISO(r.startDate);
+    const monthMatch = processedMonthFilter === "all" || leaveDate.getMonth().toString() === processedMonthFilter;
+    const yearMatch = processedYearFilter === "all" || leaveDate.getFullYear().toString() === processedYearFilter;
+    return statusMatch && typeMatch && monthMatch && yearMatch;
   });
 
   // Sorting for pending requests
@@ -529,6 +552,32 @@ const Leaves = () => {
               <>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
+                    <Select value={processedMonthFilter} onValueChange={setProcessedMonthFilter}>
+                      <SelectTrigger className="w-[130px]">
+                        <SelectValue placeholder="Month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Months</SelectItem>
+                        {MONTHS.map((month) => (
+                          <SelectItem key={month.value} value={month.value}>
+                            {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={processedYearFilter} onValueChange={setProcessedYearFilter}>
+                      <SelectTrigger className="w-[100px]">
+                        <SelectValue placeholder="Year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Years</SelectItem>
+                        {uniqueYears.map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Select value={processedStatusFilter} onValueChange={(v) => setProcessedStatusFilter(v as "all" | "approved" | "rejected")}>
                       <SelectTrigger className="w-[130px]">
                         <SelectValue placeholder="Status" />
@@ -552,13 +601,15 @@ const Leaves = () => {
                         ))}
                       </SelectContent>
                     </Select>
-                    {(processedStatusFilter !== "all" || processedTypeFilter !== "all") && (
+                    {(processedStatusFilter !== "all" || processedTypeFilter !== "all" || processedMonthFilter !== "all" || processedYearFilter !== "all") && (
                       <Button 
                         variant="ghost" 
                         size="sm"
                         onClick={() => {
                           setProcessedStatusFilter("all");
                           setProcessedTypeFilter("all");
+                          setProcessedMonthFilter("all");
+                          setProcessedYearFilter("all");
                         }}
                       >
                         Clear filters
