@@ -319,6 +319,9 @@ export type Database = {
           status: Database["public"]["Enums"]["employee_status"]
           updated_at: string
           user_id: string | null
+          working_days: number[] | null
+          working_hours_end: string | null
+          working_hours_start: string | null
         }
         Insert: {
           address?: string | null
@@ -342,6 +345,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["employee_status"]
           updated_at?: string
           user_id?: string | null
+          working_days?: number[] | null
+          working_hours_end?: string | null
+          working_hours_start?: string | null
         }
         Update: {
           address?: string | null
@@ -365,6 +371,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["employee_status"]
           updated_at?: string
           user_id?: string | null
+          working_days?: number[] | null
+          working_hours_end?: string | null
+          working_hours_start?: string | null
         }
         Relationships: [
           {
@@ -580,6 +589,7 @@ export type Database = {
       }
       notification_preferences: {
         Row: {
+          attendance_reminder_notifications: boolean | null
           created_at: string
           event_notifications: boolean
           goal_reminder_notifications: boolean
@@ -592,6 +602,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          attendance_reminder_notifications?: boolean | null
           created_at?: string
           event_notifications?: boolean
           goal_reminder_notifications?: boolean
@@ -604,6 +615,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          attendance_reminder_notifications?: boolean | null
           created_at?: string
           event_notifications?: boolean
           goal_reminder_notifications?: boolean
