@@ -57,6 +57,10 @@ const Leaves = () => {
   const [reviewNotes, setReviewNotes] = useState("");
   const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
   
+  // Processed tab filters
+  const [processedStatusFilter, setProcessedStatusFilter] = useState<"all" | "approved" | "rejected">("all");
+  const [processedTypeFilter, setProcessedTypeFilter] = useState<string>("all");
+  
   const canApproveLeaves = isAdminOrHR || roles.includes("manager");
 
   const { data: myEmployeeId, isLoading: isLoadingMyEmployee } = useQuery({
@@ -264,7 +268,17 @@ const Leaves = () => {
   };
 
   const pendingRequests = requests.filter((r) => r.status === "pending");
-  const processedRequests = requests.filter((r) => r.status !== "pending");
+  const allProcessedRequests = requests.filter((r) => r.status !== "pending");
+  
+  // Get unique leave types for filter
+  const uniqueLeaveTypes = [...new Set(allProcessedRequests.map((r) => r.type))];
+  
+  // Apply filters to processed requests
+  const processedRequests = allProcessedRequests.filter((r) => {
+    const statusMatch = processedStatusFilter === "all" || r.status === processedStatusFilter;
+    const typeMatch = processedTypeFilter === "all" || r.type === processedTypeFilter;
+    return statusMatch && typeMatch;
+  });
 
   // Sorting for pending requests
   const pendingSorting = useSorting<LeaveRequest>(pendingRequests);
@@ -503,7 +517,7 @@ const Leaves = () => {
                   <Skeleton key={i} className="h-32 w-full rounded-xl" />
                 ))}
               </div>
-            ) : processedRequests.length === 0 ? (
+            ) : allProcessedRequests.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Calendar className="mb-4 h-12 w-12 text-muted-foreground" />
@@ -513,13 +527,62 @@ const Leaves = () => {
               </Card>
             ) : (
               <>
-                <div className="flex justify-end">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select value={processedStatusFilter} onValueChange={(v) => setProcessedStatusFilter(v as "all" | "approved" | "rejected")}>
+                      <SelectTrigger className="w-[130px]">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={processedTypeFilter} onValueChange={setProcessedTypeFilter}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Leave Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        {uniqueLeaveTypes.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {(processedStatusFilter !== "all" || processedTypeFilter !== "all") && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          setProcessedStatusFilter("all");
+                          setProcessedTypeFilter("all");
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    )}
+                  </div>
                   {renderSortDropdown(processedSorting)}
                 </div>
-                {processedPagination.paginatedItems.map((request) => (
-                  <LeaveRequestCard key={request.id} request={request} />
-                ))}
-                {renderPaginationControls(processedPagination)}
+                {processedRequests.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <Calendar className="mb-4 h-12 w-12 text-muted-foreground" />
+                      <h3 className="text-lg font-semibold text-foreground">No Matching Requests</h3>
+                      <p className="text-muted-foreground">Try adjusting your filters</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    {processedPagination.paginatedItems.map((request) => (
+                      <LeaveRequestCard key={request.id} request={request} />
+                    ))}
+                    {renderPaginationControls(processedPagination)}
+                  </>
+                )}
               </>
             )}
           </TabsContent>
