@@ -24,12 +24,13 @@ import {
   Line,
   Legend,
 } from "recharts";
-import { Download, FileText, Users, Calendar, CreditCard, TrendingUp, TrendingDown, UserPlus, UserMinus } from "lucide-react";
+import { Download, FileText, Users, Calendar, CreditCard, TrendingUp, TrendingDown, UserPlus, UserMinus, Loader2, ShieldAlert } from "lucide-react";
 import { PayrollSummaryReport } from "@/components/reports/PayrollSummaryReport";
 import { LeaveBalanceReport } from "@/components/reports/LeaveBalanceReport";
 import { AssetInventoryReport } from "@/components/reports/AssetInventoryReport";
 import { AttendanceReport } from "@/components/reports/AttendanceReport";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import {
   useEmployeeGrowthData,
   useDepartmentDistribution,
@@ -59,12 +60,38 @@ const reportCards = [
 const Reports = () => {
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const year = parseInt(selectedYear);
+  const { isAdminOrHR, isLoading: roleLoading } = useIsAdminOrHR();
 
   const { data: employeeGrowthData, isLoading: isLoadingGrowth } = useEmployeeGrowthData(year);
   const { data: departmentData, isLoading: isLoadingDept } = useDepartmentDistribution();
   const { data: leaveStats, isLoading: isLoadingLeave } = useLeaveStatistics(year);
   const { data: payrollTrendData, isLoading: isLoadingPayroll } = usePayrollTrend(year);
   const { data: headcountData, isLoading: isLoadingHeadcount } = useHeadcountSummary(year);
+
+  // Show loading while checking role
+  if (roleLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-[400px] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Redirect non-admin/HR users
+  if (!isAdminOrHR) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-[400px] flex-col items-center justify-center space-y-4">
+          <ShieldAlert className="h-16 w-16 text-destructive" />
+          <h2 className="text-2xl font-bold text-foreground">Access Denied</h2>
+          <p className="text-muted-foreground">You don't have permission to access this page.</p>
+          <p className="text-sm text-muted-foreground">Only administrators and HR personnel can view reports.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

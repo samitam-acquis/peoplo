@@ -12,14 +12,16 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, Pencil, Trash2, Users } from "lucide-react";
+import { Building2, Plus, Pencil, Trash2, Users, Loader2, ShieldAlert } from "lucide-react";
 import { useDepartments, useCreateDepartment, useUpdateDepartment, useDeleteDepartment, Department } from "@/hooks/useDepartments";
+import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
 const Departments = () => {
   const { data: departments, isLoading } = useDepartments();
+  const { isAdminOrHR, isLoading: roleLoading } = useIsAdminOrHR();
   const createDepartment = useCreateDepartment();
   const updateDepartment = useUpdateDepartment();
   const deleteDepartment = useDeleteDepartment();
@@ -105,6 +107,31 @@ const Departments = () => {
       manager_id: department.manager_id || "",
     });
   };
+
+  // Show loading while checking role
+  if (roleLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-[400px] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Redirect non-admin/HR users
+  if (!isAdminOrHR) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-[400px] flex-col items-center justify-center space-y-4">
+          <ShieldAlert className="h-16 w-16 text-destructive" />
+          <h2 className="text-2xl font-bold text-foreground">Access Denied</h2>
+          <p className="text-muted-foreground">You don't have permission to access this page.</p>
+          <p className="text-sm text-muted-foreground">Only administrators and HR personnel can manage departments.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
