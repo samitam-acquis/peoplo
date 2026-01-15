@@ -127,7 +127,7 @@ const Profile = () => {
           working_hours_start,
           working_hours_end,
           working_days,
-          departments (name)
+          departments:departments!employees_department_id_fkey (name)
         `)
         .eq('user_id', user.id)
         .maybeSingle();
