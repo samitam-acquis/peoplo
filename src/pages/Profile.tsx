@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, User, Mail, Phone, MapPin, Building2, Calendar, Briefcase, Save, Shield, FileText, Clock, Wallet, Files } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,6 +45,9 @@ interface EmployeeProfile {
   gender: string | null;
   status: string;
   department: { name: string } | null;
+  working_hours_start: string | null;
+  working_hours_end: string | null;
+  working_days: number[] | null;
 }
 
 interface ProfileForm {
@@ -53,6 +57,9 @@ interface ProfileForm {
   country: string;
   date_of_birth: string;
   gender: string;
+  working_hours_start: string;
+  working_hours_end: string;
+  working_days: number[];
 }
 
 const Profile = () => {
@@ -74,6 +81,9 @@ const Profile = () => {
     country: '',
     date_of_birth: '',
     gender: '',
+    working_hours_start: '09:00',
+    working_hours_end: '18:00',
+    working_days: [1, 2, 3, 4, 5],
   });
 
   useEffect(() => {
@@ -114,6 +124,9 @@ const Profile = () => {
           date_of_birth,
           gender,
           status,
+          working_hours_start,
+          working_hours_end,
+          working_days,
           departments (name)
         `)
         .eq('user_id', user.id)
@@ -152,6 +165,12 @@ const Profile = () => {
 
   useEffect(() => {
     if (employee) {
+      // Format time from "HH:MM:SS" to "HH:MM" for input
+      const formatTimeForInput = (time: string | null) => {
+        if (!time) return '';
+        return time.slice(0, 5);
+      };
+      
       setFormData({
         phone: employee.phone || '',
         address: employee.address || '',
@@ -159,6 +178,9 @@ const Profile = () => {
         country: employee.country || '',
         date_of_birth: employee.date_of_birth || '',
         gender: employee.gender || '',
+        working_hours_start: formatTimeForInput(employee.working_hours_start) || '09:00',
+        working_hours_end: formatTimeForInput(employee.working_hours_end) || '18:00',
+        working_days: employee.working_days || [1, 2, 3, 4, 5],
       });
     }
   }, [employee]);
@@ -176,6 +198,9 @@ const Profile = () => {
           country: data.country.trim() || null,
           date_of_birth: data.date_of_birth || null,
           gender: data.gender || null,
+          working_hours_start: data.working_hours_start ? `${data.working_hours_start}:00` : null,
+          working_hours_end: data.working_hours_end ? `${data.working_hours_end}:00` : null,
+          working_days: data.working_days,
         })
         .eq('id', employee.id);
 
@@ -316,6 +341,10 @@ const Profile = () => {
                       <div className="flex gap-2">
                         <Button variant="outline" onClick={() => {
                           setIsEditing(false);
+                          const formatTimeForInput = (time: string | null) => {
+                            if (!time) return '';
+                            return time.slice(0, 5);
+                          };
                           setFormData({
                             phone: employee.phone || '',
                             address: employee.address || '',
@@ -323,6 +352,9 @@ const Profile = () => {
                             country: employee.country || '',
                             date_of_birth: employee.date_of_birth || '',
                             gender: employee.gender || '',
+                            working_hours_start: formatTimeForInput(employee.working_hours_start) || '09:00',
+                            working_hours_end: formatTimeForInput(employee.working_hours_end) || '18:00',
+                            working_days: employee.working_days || [1, 2, 3, 4, 5],
                           });
                         }}>
                           Cancel
@@ -432,6 +464,73 @@ const Profile = () => {
                       <Label>Department</Label>
                       <Input value={employee.department?.name || "Not Assigned"} disabled />
                       <p className="text-xs text-muted-foreground">Contact HR to change department assignment</p>
+                    </div>
+
+                    <Separator />
+
+                    {/* Working Schedule Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <Label className="text-base font-medium">Working Schedule</Label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Set your working hours and days for attendance reminders</p>
+                      
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Work Start Time</Label>
+                          <Input 
+                            type="time"
+                            value={formData.working_hours_start}
+                            onChange={(e) => setFormData(prev => ({ ...prev, working_hours_start: e.target.value }))}
+                            disabled={!isEditing}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Work End Time</Label>
+                          <Input 
+                            type="time"
+                            value={formData.working_hours_end}
+                            onChange={(e) => setFormData(prev => ({ ...prev, working_hours_end: e.target.value }))}
+                            disabled={!isEditing}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Working Days</Label>
+                        <div className="flex flex-wrap gap-3">
+                          {[
+                            { value: 0, label: 'Sun' },
+                            { value: 1, label: 'Mon' },
+                            { value: 2, label: 'Tue' },
+                            { value: 3, label: 'Wed' },
+                            { value: 4, label: 'Thu' },
+                            { value: 5, label: 'Fri' },
+                            { value: 6, label: 'Sat' },
+                          ].map((day) => (
+                            <div key={day.value} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`day-${day.value}`}
+                                checked={formData.working_days.includes(day.value)}
+                                onCheckedChange={(checked) => {
+                                  if (!isEditing) return;
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    working_days: checked
+                                      ? [...prev.working_days, day.value].sort((a, b) => a - b)
+                                      : prev.working_days.filter(d => d !== day.value)
+                                  }));
+                                }}
+                                disabled={!isEditing}
+                              />
+                              <Label htmlFor={`day-${day.value}`} className="text-sm font-normal cursor-pointer">
+                                {day.label}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

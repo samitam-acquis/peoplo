@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNotificationPreferences, useUpdateNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { toast } from "sonner";
-import { Bell, Calendar, FileCheck, Target, UserPlus, PartyPopper } from "lucide-react";
+import { Bell, Calendar, FileCheck, Target, UserPlus, PartyPopper, Clock } from "lucide-react";
 
 const NotificationPreferences = () => {
   const { data: preferences, isLoading } = useNotificationPreferences();
@@ -56,6 +56,12 @@ const NotificationPreferences = () => {
       label: "Onboarding Updates",
       description: "Receive notifications about onboarding tasks and progress",
       icon: UserPlus,
+    },
+    {
+      key: "attendance_reminder_notifications",
+      label: "Attendance Reminders",
+      description: "Get reminders to clock in and clock out on working days",
+      icon: Clock,
     },
   ];
 
