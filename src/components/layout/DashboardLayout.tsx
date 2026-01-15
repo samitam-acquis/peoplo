@@ -159,7 +159,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* User section */}
           <div className="border-t border-border p-4">
-            <div className="flex items-center gap-3 rounded-xl bg-muted/50 p-3">
+            <Link
+              to="/profile"
+              onClick={() => setSidebarOpen(false)}
+              className="flex items-center gap-3 rounded-xl bg-muted/50 p-3 transition-colors hover:bg-muted"
+            >
               <Avatar className="h-10 w-10">
                 <AvatarImage src={user?.user_metadata?.avatar_url} />
                 <AvatarFallback>{getUserInitials()}</AvatarFallback>
@@ -168,7 +172,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <p className="text-sm font-medium text-foreground truncate">{getUserName()}</p>
                 <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
               </div>
-            </div>
+            </Link>
           </div>
         </div>
       </aside>
