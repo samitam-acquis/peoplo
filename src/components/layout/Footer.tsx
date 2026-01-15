@@ -1,10 +1,8 @@
 import { Link } from "react-router-dom";
-import { Github, Linkedin } from "lucide-react";
+import { Github } from "lucide-react";
 import logo from "@/assets/hr-hub-logo.svg";
-
 const Footer = () => {
-  return (
-    <footer className="bg-background border-t py-16">
+  return <footer className="bg-background border-t py-16">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
@@ -45,17 +43,13 @@ const Footer = () => {
             © {new Date().getFullYear()} Peoplo. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
-            <a href="https://in.linkedin.com/company/redmonkin" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-              <Linkedin className="h-5 w-5" />
-            </a>
-            <a href="https://github.com/redmonkin/core-hr-hub" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+            
+            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
               <Github className="h-5 w-5" />
             </a>
           </div>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };
-
 export default Footer;
