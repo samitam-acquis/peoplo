@@ -20,15 +20,28 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle2, Upload, User, Briefcase, FileText, Loader2, ShieldAlert, Calendar, Mail, Phone, MapPin, Pencil, X, Check, Download, ExternalLink, Send } from "lucide-react";
+import { CheckCircle2, Upload, User, Briefcase, FileText, Loader2, ShieldAlert, Calendar, Mail, Phone, MapPin, Pencil, X, Check, Download, ExternalLink, Send, Clock, UserPlus, Eye, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDepartments } from "@/hooks/useEmployees";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
+import { useOnboardingRequests, OnboardingRequest } from "@/hooks/useOnboardingRequests";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate, useLocation } from "react-router-dom";
+import { format } from "date-fns";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -204,7 +217,10 @@ const initialDocuments: Record<string, DocumentUpload> = {
 };
 
 const Onboarding = () => {
-  const [activeTab, setActiveTab] = useState("add");
+  const currentLocation = useLocation();
+  const searchParams = new URLSearchParams(currentLocation.search);
+  const initialTab = searchParams.get('tab') || 'add';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editFormData, setEditFormData] = useState({
@@ -223,15 +239,30 @@ const Onboarding = () => {
   const [additionalDoc, setAdditionalDoc] = useState<{ file: File | null; type: string }>({ file: null, type: '' });
   const [isUploadingAdditional, setIsUploadingAdditional] = useState(false);
   const [resendingInvite, setResendingInvite] = useState<string | null>(null);
+  
+  // Requests tab state
+  const [selectedRequest, setSelectedRequest] = useState<OnboardingRequest | null>(null);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [requestToAction, setRequestToAction] = useState<OnboardingRequest | null>(null);
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isAdminOrHR, isLoading: roleLoading } = useIsAdminOrHR();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   
   const { data: departments = [], isLoading: loadingDepartments } = useDepartments();
   const { data: managers = [], isLoading: loadingManagers } = useManagers();
   const { data: onboardingEmployees = [], isLoading: loadingOnboarding } = useOnboardingEmployees();
   const { data: unlinkedUsers = [], isLoading: loadingUsers } = useUnlinkedUsers();
   const { data: employeeDocs = [], isLoading: loadingDocs } = useEmployeeDocuments(selectedEmployee?.id || null);
+  const { requests, isLoading: loadingRequests, approveRequest, rejectRequest } = useOnboardingRequests();
+
+  const pendingRequests = requests.filter((r) => r.status === "pending");
+  const approvedRequests = requests.filter((r) => r.status === "approved");
+  const rejectedRequests = requests.filter((r) => r.status === "rejected");
 
   // Get signed URL for document download
   const getDocumentUrl = async (filePath: string) => {
@@ -602,6 +633,71 @@ const Onboarding = () => {
     }
   };
 
+  // Request handling functions
+  const getRequestStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" />Pending</Badge>;
+      case "approved":
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100"><CheckCircle2 className="mr-1 h-3 w-3" />Approved</Badge>;
+      case "rejected":
+        return <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" />Rejected</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const handleApproveRequest = (request: OnboardingRequest) => {
+    setRequestToAction(request);
+    setApproveDialogOpen(true);
+  };
+
+  const handleRejectRequest = (request: OnboardingRequest) => {
+    setRequestToAction(request);
+    setRejectDialogOpen(true);
+  };
+
+  const confirmApprove = () => {
+    if (requestToAction && user) {
+      approveRequest.mutate({ requestId: requestToAction.id, userId: user.id });
+      setApproveDialogOpen(false);
+      setRequestToAction(null);
+    }
+  };
+
+  const confirmReject = () => {
+    if (requestToAction && user) {
+      rejectRequest.mutate({ requestId: requestToAction.id, userId: user.id });
+      setRejectDialogOpen(false);
+      setRequestToAction(null);
+    }
+  };
+
+  const handleCreateEmployeeFromRequest = (request: OnboardingRequest) => {
+    // Switch to add tab with pre-filled data
+    const nameParts = request.full_name.split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
+    setFormData(prev => ({
+      ...prev,
+      firstName,
+      lastName,
+      email: request.email,
+      linkedUserId: request.user_id,
+    }));
+    setActiveTab('add');
+  };
+
   const openEditMode = (employee: any) => {
     setEditFormData({
       firstName: employee.first_name || '',
@@ -733,17 +829,28 @@ const Onboarding = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:h-10 sm:max-w-md sm:grid-cols-2">
+          <TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:h-10 sm:max-w-xl sm:grid-cols-3">
             <TabsTrigger value="add" className="w-full justify-center">
-              <span className="hidden sm:inline">Add New Employee</span>
-              <span className="sm:hidden">New Employee</span>
+              <span className="hidden sm:inline">Add Employee</span>
+              <span className="sm:hidden">Add</span>
             </TabsTrigger>
             <TabsTrigger value="pending" className="w-full justify-center">
-              <span className="hidden sm:inline">Pending Onboarding</span>
+              <span className="hidden sm:inline">Pending</span>
               <span className="sm:hidden">Pending</span>
-              <Badge variant="secondary" className="ml-2">
-                {onboardingEmployees.length}
-              </Badge>
+              {onboardingEmployees.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {onboardingEmployees.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="requests" className="w-full justify-center">
+              <span className="hidden sm:inline">Requests</span>
+              <span className="sm:hidden">Requests</span>
+              {pendingRequests.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {pendingRequests.length}
+                </Badge>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -1120,6 +1227,150 @@ const Onboarding = () => {
               )}
             </div>
           </TabsContent>
+
+          {/* Requests Tab */}
+          <TabsContent value="requests" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Join Requests</CardTitle>
+                <CardDescription>
+                  Review onboarding requests from users who have signed up
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingRequests ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : requests.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <UserPlus className="mb-4 h-12 w-12 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold text-foreground">No Requests</h3>
+                    <p className="text-muted-foreground">
+                      There are no onboarding requests at this time
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Stats */}
+                    <div className="grid gap-4 sm:grid-cols-3 mb-6">
+                      <Card>
+                        <CardContent className="pt-4 pb-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-2xl font-bold">{pendingRequests.length}</p>
+                              <p className="text-xs text-muted-foreground">Pending</p>
+                            </div>
+                            <Clock className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4 pb-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-2xl font-bold">{approvedRequests.length}</p>
+                              <p className="text-xs text-muted-foreground">Approved</p>
+                            </div>
+                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4 pb-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-2xl font-bold">{rejectedRequests.length}</p>
+                              <p className="text-xs text-muted-foreground">Rejected</p>
+                            </div>
+                            <XCircle className="h-5 w-5 text-destructive" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Requests Table */}
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead className="hidden md:table-cell">Message</TableHead>
+                          <TableHead className="hidden sm:table-cell">Submitted</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {requests.map((request) => (
+                          <TableRow key={request.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback>{getInitials(request.full_name)}</AvatarFallback>
+                                </Avatar>
+                                <span className="font-medium">{request.full_name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{request.email}</TableCell>
+                            <TableCell className="hidden md:table-cell max-w-[200px] truncate text-muted-foreground">
+                              {request.message || "-"}
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell text-muted-foreground">
+                              {format(new Date(request.created_at), "MMM d, yyyy")}
+                            </TableCell>
+                            <TableCell>{getRequestStatusBadge(request.status)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setSelectedRequest(request)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                {request.status === "pending" && (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-green-600 hover:bg-green-50 hover:text-green-700"
+                                      onClick={() => handleApproveRequest(request)}
+                                      disabled={approveRequest.isPending}
+                                    >
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-destructive hover:bg-destructive/10"
+                                      onClick={() => handleRejectRequest(request)}
+                                      disabled={rejectRequest.isPending}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
+                                {request.status === "approved" && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleCreateEmployeeFromRequest(request)}
+                                  >
+                                    <UserPlus className="mr-1 h-4 w-4" />
+                                    <span className="hidden sm:inline">Create Employee</span>
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* Employee Details Dialog */}
@@ -1486,6 +1737,144 @@ const Onboarding = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Request Details Dialog */}
+        <Dialog open={!!selectedRequest} onOpenChange={(open) => !open && setSelectedRequest(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Request Details</DialogTitle>
+              <DialogDescription>
+                Onboarding request from {selectedRequest?.full_name}
+              </DialogDescription>
+            </DialogHeader>
+            {selectedRequest && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-16 w-16">
+                    <AvatarFallback className="text-lg">
+                      {getInitials(selectedRequest.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="text-lg font-semibold">{selectedRequest.full_name}</h3>
+                    <p className="text-muted-foreground">{selectedRequest.email}</p>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">Status</h4>
+                  <div className="mt-1">{getRequestStatusBadge(selectedRequest.status)}</div>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">Message</h4>
+                  <p className="mt-1 text-foreground">
+                    {selectedRequest.message || "No message provided"}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">Submitted</h4>
+                  <p className="mt-1 text-foreground">
+                    {format(new Date(selectedRequest.created_at), "MMMM d, yyyy 'at' h:mm a")}
+                  </p>
+                </div>
+                {selectedRequest.reviewed_at && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground">Reviewed</h4>
+                    <p className="mt-1 text-foreground">
+                      {format(new Date(selectedRequest.reviewed_at), "MMMM d, yyyy 'at' h:mm a")}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              {selectedRequest?.status === "pending" && (
+                <>
+                  <Button
+                    variant="outline"
+                    className="text-destructive"
+                    onClick={() => {
+                      handleRejectRequest(selectedRequest);
+                      setSelectedRequest(null);
+                    }}
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Reject
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      handleApproveRequest(selectedRequest);
+                      setSelectedRequest(null);
+                    }}
+                  >
+                    <Check className="mr-2 h-4 w-4" />
+                    Approve
+                  </Button>
+                </>
+              )}
+              {selectedRequest?.status === "approved" && (
+                <Button onClick={() => {
+                  handleCreateEmployeeFromRequest(selectedRequest);
+                  setSelectedRequest(null);
+                }}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Create Employee Record
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Approve Request Confirmation Dialog */}
+        <AlertDialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Approve Request</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to approve the onboarding request from{" "}
+                <strong>{requestToAction?.full_name}</strong>? You will then be able to create
+                an employee record for them.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmApprove}>
+                {approveRequest.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="mr-2 h-4 w-4" />
+                )}
+                Approve
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Reject Request Confirmation Dialog */}
+        <AlertDialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reject Request</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to reject the onboarding request from{" "}
+                <strong>{requestToAction?.full_name}</strong>? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmReject}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {rejectRequest.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <X className="mr-2 h-4 w-4" />
+                )}
+                Reject
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );
