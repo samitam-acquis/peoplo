@@ -28,6 +28,7 @@ import { Download, FileText, Users, Calendar, CreditCard, TrendingUp, TrendingDo
 import { PayrollSummaryReport } from "@/components/reports/PayrollSummaryReport";
 import { LeaveBalanceReport } from "@/components/reports/LeaveBalanceReport";
 import { AssetInventoryReport } from "@/components/reports/AssetInventoryReport";
+import { AttendanceReport } from "@/components/reports/AttendanceReport";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useEmployeeGrowthData,
@@ -400,6 +401,9 @@ const Reports = () => {
 
         {/* Asset Inventory Report */}
         <AssetInventoryReport />
+
+        {/* Attendance Report */}
+        <AttendanceReport />
       </div>
     </DashboardLayout>
   );
