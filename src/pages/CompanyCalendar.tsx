@@ -18,14 +18,27 @@ import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addMonths, subMonths, isSameDay, parseISO } from "date-fns";
-
-const EVENT_TYPES = [
-  { value: "holiday", label: "Public Holiday", icon: PartyPopper, color: "bg-destructive/10 text-destructive" },
-  { value: "company", label: "Company Event", icon: Briefcase, color: "bg-primary/10 text-primary" },
-  { value: "meeting", label: "All-Hands Meeting", icon: Users, color: "bg-secondary text-secondary-foreground" },
-  { value: "other", label: "Other", icon: CalendarDays, color: "bg-muted text-muted-foreground" },
-];
-
+const EVENT_TYPES = [{
+  value: "holiday",
+  label: "Public Holiday",
+  icon: PartyPopper,
+  color: "bg-destructive/10 text-destructive"
+}, {
+  value: "company",
+  label: "Company Event",
+  icon: Briefcase,
+  color: "bg-primary/10 text-primary"
+}, {
+  value: "meeting",
+  label: "All-Hands Meeting",
+  icon: Users,
+  color: "bg-secondary text-secondary-foreground"
+}, {
+  value: "other",
+  label: "Other",
+  icon: CalendarDays,
+  color: "bg-muted text-muted-foreground"
+}];
 const CompanyCalendar = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -37,39 +50,40 @@ const CompanyCalendar = () => {
     description: "",
     event_date: "",
     event_type: "company",
-    is_holiday: false,
+    is_holiday: false
   });
-
-  const { data: events, isLoading } = useCompanyEvents(currentMonth);
+  const {
+    data: events,
+    isLoading
+  } = useCompanyEvents(currentMonth);
   const createEvent = useCreateCompanyEvent();
   const updateEvent = useUpdateCompanyEvent();
   const deleteEvent = useDeleteCompanyEvent();
-  const { isAdminOrHR } = useIsAdminOrHR();
-
+  const {
+    isAdminOrHR
+  } = useIsAdminOrHR();
   const resetForm = () => {
     setFormData({
       title: "",
       description: "",
       event_date: "",
       event_type: "company",
-      is_holiday: false,
+      is_holiday: false
     });
     setEditingEvent(null);
   };
-
   const handleCreate = async () => {
     if (!formData.title.trim() || !formData.event_date) {
       toast.error("Title and date are required");
       return;
     }
-
     try {
       await createEvent.mutateAsync({
         title: formData.title.trim(),
         description: formData.description.trim() || undefined,
         event_date: formData.event_date,
         event_type: formData.event_type,
-        is_holiday: formData.is_holiday,
+        is_holiday: formData.is_holiday
       });
       toast.success("Event created successfully");
       setIsCreateOpen(false);
@@ -78,13 +92,11 @@ const CompanyCalendar = () => {
       toast.error("Failed to create event");
     }
   };
-
   const handleUpdate = async () => {
     if (!editingEvent || !formData.title.trim() || !formData.event_date) {
       toast.error("Title and date are required");
       return;
     }
-
     try {
       await updateEvent.mutateAsync({
         id: editingEvent.id,
@@ -92,7 +104,7 @@ const CompanyCalendar = () => {
         description: formData.description.trim() || undefined,
         event_date: formData.event_date,
         event_type: formData.event_type,
-        is_holiday: formData.is_holiday,
+        is_holiday: formData.is_holiday
       });
       toast.success("Event updated successfully");
       setEditingEvent(null);
@@ -101,7 +113,6 @@ const CompanyCalendar = () => {
       toast.error("Failed to update event");
     }
   };
-
   const handleDelete = async (id: string) => {
     try {
       await deleteEvent.mutateAsync(id);
@@ -110,7 +121,6 @@ const CompanyCalendar = () => {
       toast.error("Failed to delete event");
     }
   };
-
   const openEdit = (event: CompanyEvent) => {
     setEditingEvent(event);
     setFormData({
@@ -118,29 +128,27 @@ const CompanyCalendar = () => {
       description: event.description || "",
       event_date: event.event_date,
       event_type: event.event_type,
-      is_holiday: event.is_holiday,
+      is_holiday: event.is_holiday
     });
   };
-
   const openCreateWithDate = (date: Date) => {
     setFormData({
       ...formData,
-      event_date: format(date, "yyyy-MM-dd"),
+      event_date: format(date, "yyyy-MM-dd")
     });
     setIsCreateOpen(true);
   };
-
   const getEventTypeConfig = (type: string) => {
-    return EVENT_TYPES.find((t) => t.value === type) || EVENT_TYPES[3];
+    return EVENT_TYPES.find(t => t.value === type) || EVENT_TYPES[3];
   };
-
   const sendNotifications = async () => {
     setIsSendingNotifications(true);
     try {
-      const { data, error } = await supabase.functions.invoke("event-notification");
-      
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke("event-notification");
       if (error) throw error;
-      
       toast.success(data.message || "Notifications sent successfully");
     } catch (error) {
       console.error("Error sending notifications:", error);
@@ -149,29 +157,18 @@ const CompanyCalendar = () => {
       setIsSendingNotifications(false);
     }
   };
-
-  const eventsOnSelectedDate = selectedDate
-    ? events?.filter((e) => isSameDay(parseISO(e.event_date), selectedDate))
-    : [];
-
-  const eventDates = events?.map((e) => parseISO(e.event_date)) || [];
-
-  return (
-    <DashboardLayout>
+  const eventsOnSelectedDate = selectedDate ? events?.filter(e => isSameDay(parseISO(e.event_date), selectedDate)) : [];
+  const eventDates = events?.map(e => parseISO(e.event_date)) || [];
+  return <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Company Calendar</h2>
+            <h2 className="text-2xl font-bold text-foreground">Calendar</h2>
             <p className="text-muted-foreground">View holidays and company events</p>
           </div>
-          {isAdminOrHR && (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={sendNotifications}
-                disabled={isSendingNotifications}
-              >
+          {isAdminOrHR && <div className="flex gap-2">
+              <Button variant="outline" onClick={sendNotifications} disabled={isSendingNotifications}>
                 <Mail className="mr-2 h-4 w-4" />
                 {isSendingNotifications ? "Sending..." : "Send Notifications"}
               </Button>
@@ -190,55 +187,46 @@ const CompanyCalendar = () => {
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="title">Title *</Label>
-                    <Input
-                      id="title"
-                      placeholder="e.g., Independence Day"
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    />
+                    <Input id="title" placeholder="e.g., Independence Day" value={formData.title} onChange={e => setFormData({
+                    ...formData,
+                    title: e.target.value
+                  })} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="event_date">Date *</Label>
-                    <Input
-                      id="event_date"
-                      type="date"
-                      value={formData.event_date}
-                      onChange={(e) => setFormData({ ...formData, event_date: e.target.value })}
-                    />
+                    <Input id="event_date" type="date" value={formData.event_date} onChange={e => setFormData({
+                    ...formData,
+                    event_date: e.target.value
+                  })} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="event_type">Event Type</Label>
-                    <Select
-                      value={formData.event_type}
-                      onValueChange={(value) => setFormData({ ...formData, event_type: value })}
-                    >
+                    <Select value={formData.event_type} onValueChange={value => setFormData({
+                    ...formData,
+                    event_type: value
+                  })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {EVENT_TYPES.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
+                        {EVENT_TYPES.map(type => <SelectItem key={type.value} value={type.value}>
                             {type.label}
-                          </SelectItem>
-                        ))}
+                          </SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Additional details about the event"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    />
+                    <Textarea id="description" placeholder="Additional details about the event" value={formData.description} onChange={e => setFormData({
+                    ...formData,
+                    description: e.target.value
+                  })} />
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Switch
-                      id="is_holiday"
-                      checked={formData.is_holiday}
-                      onCheckedChange={(checked) => setFormData({ ...formData, is_holiday: checked })}
-                    />
+                    <Switch id="is_holiday" checked={formData.is_holiday} onCheckedChange={checked => setFormData({
+                    ...formData,
+                    is_holiday: checked
+                  })} />
                     <Label htmlFor="is_holiday">Mark as paid holiday (office closed)</Label>
                   </div>
                 </div>
@@ -252,8 +240,7 @@ const CompanyCalendar = () => {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            </div>
-          )}
+            </div>}
         </div>
 
         {/* Stats */}
@@ -267,7 +254,7 @@ const CompanyCalendar = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Holidays This Month</p>
                   <p className="text-2xl font-bold">
-                    {events?.filter((e) => e.is_holiday).length || 0}
+                    {events?.filter(e => e.is_holiday).length || 0}
                   </p>
                 </div>
               </div>
@@ -282,7 +269,7 @@ const CompanyCalendar = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Company Events</p>
                   <p className="text-2xl font-bold">
-                    {events?.filter((e) => e.event_type === "company").length || 0}
+                    {events?.filter(e => e.event_type === "company").length || 0}
                   </p>
                 </div>
               </div>
@@ -312,45 +299,24 @@ const CompanyCalendar = () => {
                 <CardDescription>Click on a date to view events</CardDescription>
               </div>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                >
+                <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                >
+                <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-[300px] w-full" />
-              ) : (
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  month={currentMonth}
-                  onMonthChange={setCurrentMonth}
-                  className="rounded-md border p-3"
-                  modifiers={{
-                    hasEvent: eventDates,
-                  }}
-                  modifiersStyles={{
-                    hasEvent: {
-                      fontWeight: "bold",
-                      backgroundColor: "hsl(var(--primary) / 0.1)",
-                      color: "hsl(var(--primary))",
-                    },
-                  }}
-                />
-              )}
+              {isLoading ? <Skeleton className="h-[300px] w-full" /> : <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} month={currentMonth} onMonthChange={setCurrentMonth} className="rounded-md border p-3" modifiers={{
+              hasEvent: eventDates
+            }} modifiersStyles={{
+              hasEvent: {
+                fontWeight: "bold",
+                backgroundColor: "hsl(var(--primary) / 0.1)",
+                color: "hsl(var(--primary))"
+              }
+            }} />}
             </CardContent>
           </Card>
 
@@ -365,38 +331,19 @@ const CompanyCalendar = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <Skeleton key={i} className="h-20 w-full" />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {(selectedDate ? eventsOnSelectedDate : events)?.length === 0 ? (
-                    <div className="flex h-32 flex-col items-center justify-center text-center text-muted-foreground">
+              {isLoading ? <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+                </div> : <div className="space-y-4">
+                  {(selectedDate ? eventsOnSelectedDate : events)?.length === 0 ? <div className="flex h-32 flex-col items-center justify-center text-center text-muted-foreground">
                       <CalendarDays className="mb-2 h-8 w-8" />
                       <p>No events {selectedDate ? "on this date" : "this month"}</p>
-                      {isAdminOrHR && selectedDate && (
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="mt-2"
-                          onClick={() => openCreateWithDate(selectedDate)}
-                        >
+                      {isAdminOrHR && selectedDate && <Button variant="link" size="sm" className="mt-2" onClick={() => openCreateWithDate(selectedDate)}>
                           Add an event
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    (selectedDate ? eventsOnSelectedDate : events)?.map((event) => {
-                      const typeConfig = getEventTypeConfig(event.event_type);
-                      const Icon = typeConfig.icon;
-                      return (
-                        <div
-                          key={event.id}
-                          className="rounded-lg border p-4 transition-colors hover:bg-muted/50"
-                        >
+                        </Button>}
+                    </div> : (selectedDate ? eventsOnSelectedDate : events)?.map(event => {
+                const typeConfig = getEventTypeConfig(event.event_type);
+                const Icon = typeConfig.icon;
+                return <div key={event.id} className="rounded-lg border p-4 transition-colors hover:bg-muted/50">
                           <div className="flex items-start justify-between">
                             <div className="flex items-start gap-3">
                               <div className={`rounded-lg p-2 ${typeConfig.color}`}>
@@ -407,26 +354,15 @@ const CompanyCalendar = () => {
                                 <p className="text-sm text-muted-foreground">
                                   {format(parseISO(event.event_date), "MMM d, yyyy")}
                                 </p>
-                                {event.is_holiday && (
-                                  <Badge variant="destructive" className="mt-1">
+                                {event.is_holiday && <Badge variant="destructive" className="mt-1">
                                     Holiday
-                                  </Badge>
-                                )}
+                                  </Badge>}
                               </div>
                             </div>
-                            {isAdminOrHR && (
-                              <div className="flex gap-1">
-                                <Dialog
-                                  open={editingEvent?.id === event.id}
-                                  onOpenChange={(open) => !open && setEditingEvent(null)}
-                                >
+                            {isAdminOrHR && <div className="flex gap-1">
+                                <Dialog open={editingEvent?.id === event.id} onOpenChange={open => !open && setEditingEvent(null)}>
                                   <DialogTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => openEdit(event)}
-                                    >
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(event)}>
                                       <Pencil className="h-3 w-3" />
                                     </Button>
                                   </DialogTrigger>
@@ -438,79 +374,56 @@ const CompanyCalendar = () => {
                                     <div className="space-y-4 py-4">
                                       <div className="space-y-2">
                                         <Label htmlFor="edit-title">Title *</Label>
-                                        <Input
-                                          id="edit-title"
-                                          value={formData.title}
-                                          onChange={(e) =>
-                                            setFormData({ ...formData, title: e.target.value })
-                                          }
-                                        />
+                                        <Input id="edit-title" value={formData.title} onChange={e => setFormData({
+                                ...formData,
+                                title: e.target.value
+                              })} />
                                       </div>
                                       <div className="space-y-2">
                                         <Label htmlFor="edit-event_date">Date *</Label>
-                                        <Input
-                                          id="edit-event_date"
-                                          type="date"
-                                          value={formData.event_date}
-                                          onChange={(e) =>
-                                            setFormData({ ...formData, event_date: e.target.value })
-                                          }
-                                        />
+                                        <Input id="edit-event_date" type="date" value={formData.event_date} onChange={e => setFormData({
+                                ...formData,
+                                event_date: e.target.value
+                              })} />
                                       </div>
                                       <div className="space-y-2">
                                         <Label htmlFor="edit-event_type">Event Type</Label>
-                                        <Select
-                                          value={formData.event_type}
-                                          onValueChange={(value) =>
-                                            setFormData({ ...formData, event_type: value })
-                                          }
-                                        >
+                                        <Select value={formData.event_type} onValueChange={value => setFormData({
+                                ...formData,
+                                event_type: value
+                              })}>
                                           <SelectTrigger>
                                             <SelectValue />
                                           </SelectTrigger>
                                           <SelectContent>
-                                            {EVENT_TYPES.map((type) => (
-                                              <SelectItem key={type.value} value={type.value}>
+                                            {EVENT_TYPES.map(type => <SelectItem key={type.value} value={type.value}>
                                                 {type.label}
-                                              </SelectItem>
-                                            ))}
+                                              </SelectItem>)}
                                           </SelectContent>
                                         </Select>
                                       </div>
                                       <div className="space-y-2">
                                         <Label htmlFor="edit-description">Description</Label>
-                                        <Textarea
-                                          id="edit-description"
-                                          value={formData.description}
-                                          onChange={(e) =>
-                                            setFormData({ ...formData, description: e.target.value })
-                                          }
-                                        />
+                                        <Textarea id="edit-description" value={formData.description} onChange={e => setFormData({
+                                ...formData,
+                                description: e.target.value
+                              })} />
                                       </div>
                                       <div className="flex items-center space-x-2">
-                                        <Switch
-                                          id="edit-is_holiday"
-                                          checked={formData.is_holiday}
-                                          onCheckedChange={(checked) =>
-                                            setFormData({ ...formData, is_holiday: checked })
-                                          }
-                                        />
+                                        <Switch id="edit-is_holiday" checked={formData.is_holiday} onCheckedChange={checked => setFormData({
+                                ...formData,
+                                is_holiday: checked
+                              })} />
                                         <Label htmlFor="edit-is_holiday">
                                           Mark as paid holiday
                                         </Label>
                                       </div>
                                     </div>
                                     <DialogFooter>
-                                      <Button
-                                        variant="outline"
-                                        onClick={() => setEditingEvent(null)}
-                                      >
+                                      <Button variant="outline" onClick={() => setEditingEvent(null)}>
                                         Cancel
                                       </Button>
-                                      <Button
-                                        onClick={handleUpdate}
-                                        disabled={updateEvent.isPending}
-                                      >
+                                      <Button onClick={handleUpdate} disabled={updateEvent.isPending}>
                                         Save Changes
                                       </Button>
                                     </DialogFooter>
@@ -532,35 +445,24 @@ const CompanyCalendar = () => {
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => handleDelete(event.id)}
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      >
+                                      <AlertDialogAction onClick={() => handleDelete(event.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                                         Delete
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
-                              </div>
-                            )}
+                              </div>}
                           </div>
-                          {event.description && (
-                            <p className="mt-2 text-sm text-muted-foreground">
+                          {event.description && <p className="mt-2 text-sm text-muted-foreground">
                               {event.description}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
+                            </p>}
+                        </div>;
+              })}
+                </div>}
             </CardContent>
           </Card>
         </div>
       </div>
-    </DashboardLayout>
-  );
+    </DashboardLayout>;
 };
-
 export default CompanyCalendar;
