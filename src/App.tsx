@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import CookieConsent from "@/components/layout/CookieConsent";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Landing from "./pages/Landing";
@@ -16,7 +16,6 @@ import Security from "./pages/Security";
 import Index from "./pages/Index";
 import Employees from "./pages/Employees";
 import Onboarding from "./pages/Onboarding";
-import OnboardingRequests from "./pages/OnboardingRequests";
 import Leaves from "./pages/Leaves";
 import LeaveApprovals from "./pages/LeaveApprovals";
 import Assets from "./pages/Assets";
@@ -58,7 +57,8 @@ const App = () => (
             <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
             <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-            <Route path="/onboarding-requests" element={<ProtectedRoute><OnboardingRequests /></ProtectedRoute>} />
+            {/* Redirect old onboarding-requests route to onboarding with requests tab */}
+            <Route path="/onboarding-requests" element={<Navigate to="/onboarding?tab=requests" replace />} />
             <Route path="/leaves" element={<ProtectedRoute><Leaves /></ProtectedRoute>} />
             <Route path="/leave-approvals" element={<ProtectedRoute><LeaveApprovals /></ProtectedRoute>} />
             <Route path="/assets" element={<ProtectedRoute><Assets /></ProtectedRoute>} />
