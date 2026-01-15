@@ -21,7 +21,6 @@ import {
   MoreHorizontal, 
   Eye, 
   Edit, 
-  Trash2, 
   FileText, 
   ChevronDown,
   UserX,
@@ -47,7 +46,7 @@ interface EmployeeTableProps {
   employees: Employee[];
   onView?: (employee: Employee) => void;
   onEdit?: (employee: Employee) => void;
-  onDelete?: (employee: Employee) => void;
+  
   onManageDocuments?: (employee: Employee) => void;
   isAdminOrHR?: boolean;
   sortKey?: keyof Employee | null;
@@ -70,7 +69,7 @@ export function EmployeeTable({
   employees, 
   onView, 
   onEdit, 
-  onDelete, 
+   
   onManageDocuments, 
   isAdminOrHR = false,
   sortKey,
@@ -138,14 +137,6 @@ export function EmployeeTable({
                 <DropdownMenuItem onClick={() => onBulkAction?.('deactivate', selectedIds)}>
                   <UserX className="mr-2 h-4 w-4" />
                   Set as Inactive
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={() => onBulkAction?.('delete', selectedIds)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Selected
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -289,13 +280,6 @@ export function EmployeeTable({
                           <DropdownMenuItem onClick={() => onManageDocuments?.(employee)}>
                             <FileText className="mr-2 h-4 w-4" />
                             Documents
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => onDelete?.(employee)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
                           </DropdownMenuItem>
                         </>
                       )}
