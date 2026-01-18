@@ -25,7 +25,7 @@ const sendEmail = async (to: string[], subject: string, html: string) => {
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: "HR System <onboarding@resend.dev>",
+      from: "HR Hub <onboarding@resend.dev>",
       to,
       subject,
       html,
@@ -212,6 +212,9 @@ serve(async (req) => {
                   <strong>Goal:</strong> ${safeGoalTitle}<br>
                   <strong>Due Date:</strong> ${new Date(goal.due_date).toLocaleDateString()}<br>
                   <strong>Current Progress:</strong> ${goal.progress}%
+                </p>
+                <p>
+                  <a href="https://hrhub.redmonk.in/performance" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Update Goal Progress</a>
                 </p>
                 <p style="color: #999; font-size: 12px; margin-top: 30px;">You can manage your notification preferences in your profile settings.</p>
                 <p style="margin-top: 20px;">Best regards,<br>HR Team</p>

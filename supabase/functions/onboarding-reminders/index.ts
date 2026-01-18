@@ -28,7 +28,7 @@ const sendEmail = async (to: string[], subject: string, html: string) => {
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: "HR System <onboarding@resend.dev>",
+      from: "HR Hub <onboarding@resend.dev>",
       to,
       subject,
       html,
@@ -121,6 +121,9 @@ serve(async (req) => {
                 <li>Set up your work accounts</li>
                 <li>Complete any required training</li>
               </ul>
+              <p>
+                <a href="https://hrhub.redmonk.in/profile" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Complete Your Profile</a>
+              </p>
               <p>If you have any questions, please reach out to HR or your manager.</p>
               <p>Best regards,<br>HR Team</p>
             `
@@ -214,9 +217,12 @@ serve(async (req) => {
                         <td style="padding: 8px; border: 1px solid #ddd;">${new Date(e.hire_date).toLocaleDateString()}</td>
                       </tr>
                     `).join("")}
-                  </tbody>
-                </table>
-                <p style="margin-top: 16px;">Please follow up with these employees to complete their onboarding.</p>
+                    </tbody>
+                  </table>
+                  <p style="margin-top: 16px;">
+                    <a href="https://hrhub.redmonk.in/onboarding" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">View All Pending</a>
+                  </p>
+                  <p style="margin-top: 16px;">Please follow up with these employees to complete their onboarding.</p>
               `
             );
             console.log("Sent HR summary email");

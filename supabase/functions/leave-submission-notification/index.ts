@@ -25,7 +25,7 @@ const sendEmail = async (to: string[], subject: string, html: string) => {
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: "HR System <onboarding@resend.dev>",
+      from: "HR Hub <onboarding@resend.dev>",
       to,
       subject,
       html,
@@ -183,7 +183,9 @@ serve(async (req) => {
             ${safeReason ? `<p style="margin: 10px 0 0;"><strong>Reason:</strong> ${safeReason}</p>` : ""}
           </div>
           
-          <p>Please log in to the HR portal to review and approve/reject this request.</p>
+184:           <p>
+185:             <a href="https://hrhub.redmonk.in/leaves" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Review Request</a>
+186:           </p>
           
           <p style="margin-top: 30px;">Best regards,<br>HR System</p>
         </div>
