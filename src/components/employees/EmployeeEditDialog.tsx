@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { isValidEmployeeCode } from "@/hooks/useNextEmployeeCode";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Employee } from "./EmployeeTable";
-import { Loader2 } from "lucide-react";
+import { Loader2, Hash } from "lucide-react";
 
 interface EmployeeEditDialogProps {
   employee: Employee | null;
@@ -29,6 +30,7 @@ interface EmployeeEditDialogProps {
 }
 
 interface EditFormData {
+  employee_code: string;
   first_name: string;
   last_name: string;
   email: string;
@@ -42,6 +44,7 @@ interface EditFormData {
 export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEditDialogProps) {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<EditFormData>({
+    employee_code: "",
     first_name: "",
     last_name: "",
     email: "",
@@ -61,6 +64,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
         .from("employees")
         .select(`
           id,
+          employee_code,
           first_name,
           last_name,
           email,
@@ -115,6 +119,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
   useEffect(() => {
     if (employeeDetails) {
       setFormData({
+        employee_code: employeeDetails.employee_code || "",
         first_name: employeeDetails.first_name || "",
         last_name: employeeDetails.last_name || "",
         email: employeeDetails.email || "",
@@ -132,6 +137,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
       const { error } = await supabase
         .from("employees")
         .update({
+          employee_code: data.employee_code.trim().toUpperCase(),
           first_name: data.first_name,
           last_name: data.last_name,
           email: data.email,
@@ -157,6 +163,10 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.employee_code || !isValidEmployeeCode(formData.employee_code)) {
+      toast.error("Employee code must be in format ACQ001");
+      return;
+    }
     if (!formData.first_name || !formData.last_name || !formData.email || !formData.designation) {
       toast.error("Please fill in all required fields");
       return;
@@ -182,6 +192,20 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="employee_code">Employee Number *</Label>
+              <div className="relative">
+                <Hash className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="employee_code"
+                  value={formData.employee_code}
+                  onChange={(e) => setFormData({ ...formData, employee_code: e.target.value.toUpperCase() })}
+                  className="pl-9 font-mono"
+                  required
+                />
+              </div>
+            </div>
+            
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="first_name">First Name *</Label>
