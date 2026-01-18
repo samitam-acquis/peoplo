@@ -23,7 +23,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Employee } from "./EmployeeTable";
-import { Loader2, Hash } from "lucide-react";
+import { Loader2, Hash, IndianRupee } from "lucide-react";
 
 const WEEKDAYS = [
   { value: 0, label: 'Sun' },
@@ -63,6 +63,25 @@ interface EditFormData {
   status: string;
 }
 
+interface SalaryFormData {
+  basic_salary: string;
+  hra: string;
+  transport_allowance: string;
+  medical_allowance: string;
+  other_allowances: string;
+  tax_deduction: string;
+  other_deductions: string;
+  effective_from: string;
+}
+
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value);
+};
+
 export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEditDialogProps) {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<EditFormData>({
@@ -86,6 +105,61 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
     working_days: [1, 2, 3, 4, 5],
     status: "active",
   });
+
+  const [salaryData, setSalaryData] = useState<SalaryFormData>({
+    basic_salary: "",
+    hra: "",
+    transport_allowance: "",
+    medical_allowance: "",
+    other_allowances: "",
+    tax_deduction: "",
+    other_deductions: "",
+    effective_from: new Date().toISOString().split("T")[0],
+  });
+
+  // Fetch salary structure for this employee
+  const { data: salaryStructure, isLoading: isLoadingSalary } = useQuery({
+    queryKey: ["employee-salary-structure", employee?.id],
+    queryFn: async () => {
+      if (!employee?.id) return null;
+      const { data, error } = await supabase
+        .from("salary_structures")
+        .select("*")
+        .eq("employee_id", employee.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: open && !!employee?.id,
+  });
+
+  // Update salary data when structure is loaded
+  useEffect(() => {
+    if (salaryStructure) {
+      setSalaryData({
+        basic_salary: salaryStructure.basic_salary?.toString() || "",
+        hra: salaryStructure.hra?.toString() || "",
+        transport_allowance: salaryStructure.transport_allowance?.toString() || "",
+        medical_allowance: salaryStructure.medical_allowance?.toString() || "",
+        other_allowances: salaryStructure.other_allowances?.toString() || "",
+        tax_deduction: salaryStructure.tax_deduction?.toString() || "",
+        other_deductions: salaryStructure.other_deductions?.toString() || "",
+        effective_from: salaryStructure.effective_from || new Date().toISOString().split("T")[0],
+      });
+    } else {
+      setSalaryData({
+        basic_salary: "",
+        hra: "",
+        transport_allowance: "",
+        medical_allowance: "",
+        other_allowances: "",
+        tax_deduction: "",
+        other_deductions: "",
+        effective_from: new Date().toISOString().split("T")[0],
+      });
+    }
+  }, [salaryStructure]);
 
   // Fetch full employee details when dialog opens
   const { data: employeeDetails, isLoading: isLoadingDetails } = useQuery({
@@ -221,15 +295,44 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Employee updated successfully");
-      onOpenChange(false);
     },
     onError: (error) => {
       toast.error(`Failed to update employee: ${error.message}`);
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const salaryMutation = useMutation({
+    mutationFn: async (data: SalaryFormData) => {
+      if (!employee?.id) throw new Error("Employee ID is required");
+
+      const salaryPayload = {
+        employee_id: employee.id,
+        basic_salary: parseFloat(data.basic_salary) || 0,
+        hra: parseFloat(data.hra) || 0,
+        transport_allowance: parseFloat(data.transport_allowance) || 0,
+        medical_allowance: parseFloat(data.medical_allowance) || 0,
+        other_allowances: parseFloat(data.other_allowances) || 0,
+        tax_deduction: parseFloat(data.tax_deduction) || 0,
+        other_deductions: parseFloat(data.other_deductions) || 0,
+        effective_from: data.effective_from,
+      };
+
+      const { error } = await supabase
+        .from("salary_structures")
+        .upsert(salaryPayload, { onConflict: "employee_id" });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salary-structures"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-salary-structure", employee?.id] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to update salary structure: ${error.message}`);
+    },
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.employee_code || !isValidEmployeeCode(formData.employee_code)) {
       toast.error("Employee code must be in format ACQ001");
@@ -243,8 +346,41 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
       toast.error("Reporting manager is required for non-department managers");
       return;
     }
-    updateMutation.mutate(formData);
+
+    try {
+      // Update employee details
+      await updateMutation.mutateAsync(formData);
+      
+      // Update salary structure if basic salary is provided
+      if (salaryData.basic_salary) {
+        await salaryMutation.mutateAsync(salaryData);
+      }
+      
+      toast.success("Employee updated successfully");
+      onOpenChange(false);
+    } catch {
+      // Errors are handled in individual mutation error handlers
+    }
   };
+
+  // Calculate salary totals for display
+  const calculateSalaryTotals = () => {
+    const basic = parseFloat(salaryData.basic_salary) || 0;
+    const hra = parseFloat(salaryData.hra) || 0;
+    const transport = parseFloat(salaryData.transport_allowance) || 0;
+    const medical = parseFloat(salaryData.medical_allowance) || 0;
+    const other = parseFloat(salaryData.other_allowances) || 0;
+    const tax = parseFloat(salaryData.tax_deduction) || 0;
+    const otherDed = parseFloat(salaryData.other_deductions) || 0;
+
+    const totalAllowances = hra + transport + medical + other;
+    const totalDeductions = tax + otherDed;
+    const netSalary = basic + totalAllowances - totalDeductions;
+
+    return { totalAllowances, totalDeductions, netSalary };
+  };
+
+  const salaryTotals = calculateSalaryTotals();
 
   if (!employee) return null;
 
@@ -261,10 +397,11 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="basic">Basic Info</TabsTrigger>
                 <TabsTrigger value="job">Job Details</TabsTrigger>
                 <TabsTrigger value="schedule">Schedule</TabsTrigger>
+                <TabsTrigger value="salary">Salary</TabsTrigger>
               </TabsList>
               
               <TabsContent value="basic" className="space-y-4 mt-4">
@@ -544,14 +681,161 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                   </div>
                 </div>
               </TabsContent>
+
+              <TabsContent value="salary" className="space-y-4 mt-4">
+                {isLoadingSalary ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="basic_salary">Basic Salary *</Label>
+                        <div className="relative">
+                          <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            id="basic_salary"
+                            type="number"
+                            value={salaryData.basic_salary}
+                            onChange={(e) => setSalaryData({ ...salaryData, basic_salary: e.target.value })}
+                            className="pl-9"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="effective_from">Effective From *</Label>
+                        <Input
+                          id="effective_from"
+                          type="date"
+                          value={salaryData.effective_from}
+                          onChange={(e) => setSalaryData({ ...salaryData, effective_from: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground">Allowances</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="hra">HRA</Label>
+                          <div className="relative">
+                            <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="hra"
+                              type="number"
+                              value={salaryData.hra}
+                              onChange={(e) => setSalaryData({ ...salaryData, hra: e.target.value })}
+                              className="pl-9"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="transport_allowance">Transport Allowance</Label>
+                          <div className="relative">
+                            <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="transport_allowance"
+                              type="number"
+                              value={salaryData.transport_allowance}
+                              onChange={(e) => setSalaryData({ ...salaryData, transport_allowance: e.target.value })}
+                              className="pl-9"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="medical_allowance">Medical Allowance</Label>
+                          <div className="relative">
+                            <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="medical_allowance"
+                              type="number"
+                              value={salaryData.medical_allowance}
+                              onChange={(e) => setSalaryData({ ...salaryData, medical_allowance: e.target.value })}
+                              className="pl-9"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="other_allowances">Other Allowances</Label>
+                          <div className="relative">
+                            <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="other_allowances"
+                              type="number"
+                              value={salaryData.other_allowances}
+                              onChange={(e) => setSalaryData({ ...salaryData, other_allowances: e.target.value })}
+                              className="pl-9"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground">Deductions</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="tax_deduction">Tax Deduction</Label>
+                          <div className="relative">
+                            <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="tax_deduction"
+                              type="number"
+                              value={salaryData.tax_deduction}
+                              onChange={(e) => setSalaryData({ ...salaryData, tax_deduction: e.target.value })}
+                              className="pl-9"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="other_deductions">Other Deductions</Label>
+                          <div className="relative">
+                            <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="other_deductions"
+                              type="number"
+                              value={salaryData.other_deductions}
+                              onChange={(e) => setSalaryData({ ...salaryData, other_deductions: e.target.value })}
+                              className="pl-9"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Allowances</span>
+                        <span className="text-green-600 dark:text-green-400">+{formatCurrency(salaryTotals.totalAllowances)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Deductions</span>
+                        <span className="text-red-600 dark:text-red-400">-{formatCurrency(salaryTotals.totalDeductions)}</span>
+                      </div>
+                      <div className="border-t border-border pt-2 flex justify-between font-medium">
+                        <span>Net Salary</span>
+                        <span>{formatCurrency(salaryTotals.netSalary)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </TabsContent>
             </Tabs>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={updateMutation.isPending}>
-                {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={updateMutation.isPending || salaryMutation.isPending}>
+                {(updateMutation.isPending || salaryMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
               </Button>
             </DialogFooter>
