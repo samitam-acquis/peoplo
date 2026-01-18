@@ -26,7 +26,9 @@ const ALLOWED_REDIRECT_HOSTS = [
   'lovable.dev',           // Lovable development URLs
   'localhost',             // Local development
   '127.0.0.1',             // Local development
-  'corehrhub.lovable.app', // Published domain for this app
+  'corehrhub.lovable.app', // Lovable published domain
+  'hrhub.redmonk.in',      // Production domain
+  'redmonk.in',            // Production parent domain
 ];
 
 // Validate that a URL is safe for redirect
@@ -94,7 +96,7 @@ const sendWelcomeEmail = async (
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: "HR System <onboarding@resend.dev>",
+      from: "HR Hub <onboarding@resend.dev>",
       to: [to],
       subject: "Welcome to the Team! Set Up Your Account",
       html: `

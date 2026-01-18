@@ -35,7 +35,7 @@ const sendEmail = async (to: string[], subject: string, html: string) => {
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: "HR System <onboarding@resend.dev>",
+      from: "HR Hub <onboarding@resend.dev>",
       to,
       subject,
       html,
@@ -180,6 +180,9 @@ serve(async (req) => {
                     ${safeMessage ? `<li><strong>Message:</strong> ${safeMessage}</li>` : ""}
                   </ul>
                   <p>Please review this request and take appropriate action.</p>
+                  <p>
+                    <a href="https://hrhub.redmonk.in/onboarding" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Review Request</a>
+                  </p>
                   <p style="color: #999; font-size: 12px; margin-top: 30px;">You can manage your notification preferences in your profile settings.</p>
                 `
               );
@@ -220,6 +223,11 @@ serve(async (req) => {
             <h2>Onboarding Request ${statusText}</h2>
             <p>Hi ${safeUserName},</p>
             <p>${statusMessage}</p>
+            ${type === "approved" ? `
+            <p>
+              <a href="https://hrhub.redmonk.in" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Go to HR Hub</a>
+            </p>
+            ` : ""}
             <p>Best regards,<br>HR Team</p>
           `
         );
