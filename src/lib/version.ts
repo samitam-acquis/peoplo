@@ -62,7 +62,20 @@ export const FALLBACK_VERSION_RESPONSE: VersionResponse = {
   documentationUrl: "https://peoplo.redmonk.in",
 };
 
+// Detect if running in an auto-updating environment (Lovable Cloud / production)
+export function isAutoUpdatingEnvironment(): boolean {
+  if (typeof window === "undefined") return false;
+  const hostname = window.location.hostname;
+  return (
+    hostname.includes("lovable") ||
+    hostname === "peoplo.redmonk.in" ||
+    hostname.endsWith(".redmonk.in")
+  );
+}
+
 export async function checkForUpdates(): Promise<VersionResponse | null> {
+  const isAutoUpdating = isAutoUpdatingEnvironment();
+
   try {
     // First try the local edge function (Lovable Cloud / connected Supabase)
     const { data, error } = await supabase.functions.invoke("version-check", {
@@ -70,19 +83,41 @@ export async function checkForUpdates(): Promise<VersionResponse | null> {
     });
 
     if (!error && data) {
-      return data as VersionResponse;
+      const response = data as VersionResponse;
+      
+      // For auto-updating environments, never show update notification
+      // but still use the latest version info from GitHub for display
+      if (isAutoUpdating) {
+        return {
+          ...response,
+          currentVersion: response.currentVersion, // Use latest from GitHub
+          hasUpdate: false, // Never prompt for updates
+        };
+      }
+      
+      return response;
     }
 
-    // In Lovable preview/published environments, the public peoplo.redmonk.in endpoint
-    // may not be deployed yet, so don't block UI on a failing network call.
-    const isLovableHost =
-      typeof window !== "undefined" && window.location.hostname.includes("lovable");
-
-    if (isLovableHost) {
-      return FALLBACK_VERSION_RESPONSE;
+    // Fallback for when edge function is unavailable
+    if (isAutoUpdating) {
+      // For cloud/production, try to fetch from production API for latest changelog
+      try {
+        const response = await fetch(`${VERSION_API_URL}?version=${APP_VERSION}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          return { ...data, hasUpdate: false };
+        }
+      } catch {
+        // Ignore fetch errors for cloud environments
+      }
+      return { ...FALLBACK_VERSION_RESPONSE, hasUpdate: false };
     }
 
-    // Self-hosted / OSS instances: always fallback to the public production API
+    // Self-hosted / OSS instances: fetch from production API
     const response = await fetch(`${VERSION_API_URL}?version=${APP_VERSION}`, {
       method: "GET",
       headers: {
@@ -97,6 +132,8 @@ export async function checkForUpdates(): Promise<VersionResponse | null> {
     return FALLBACK_VERSION_RESPONSE;
   } catch (error) {
     console.error("Error checking for updates:", error);
-    return FALLBACK_VERSION_RESPONSE;
+    return isAutoUpdating 
+      ? { ...FALLBACK_VERSION_RESPONSE, hasUpdate: false }
+      : FALLBACK_VERSION_RESPONSE;
   }
 }
