@@ -106,6 +106,32 @@ Use these types in your changelog entries:
 | `docs` | Documentation updates |
 | `breaking` | Breaking changes |
 
+## Development Setup
+
+Run the setup script to install git hooks:
+
+```bash
+./scripts/setup.sh
+```
+
+This installs:
+- **Pre-commit hook**: Validates version format (semver) and ensures `LOCAL_CHANGELOG` contains an entry for the current `APP_VERSION`
+
+## Git Hooks
+
+### Pre-commit Hook
+
+The pre-commit hook runs automatically when you commit changes to `src/lib/version.ts` and validates:
+
+1. **Version format**: Must be valid semver (X.Y.Z)
+2. **Changelog entry**: `LOCAL_CHANGELOG` must contain an entry matching `APP_VERSION`
+3. **Fallback sync**: Warns if `FALLBACK_VERSION_RESPONSE.currentVersion` doesn't match
+
+To bypass the hook in emergencies:
+```bash
+git commit --no-verify -m "your message"
+```
+
 ## Manual Version Bump
 
 If you prefer not to use the script, manually edit `src/lib/version.ts`:
