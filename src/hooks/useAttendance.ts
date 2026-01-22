@@ -11,7 +11,27 @@ export interface AttendanceRecord {
   total_hours: number | null;
   status: string;
   notes: string | null;
+  clock_in_latitude: number | null;
+  clock_in_longitude: number | null;
+  clock_in_location_name: string | null;
+  clock_out_latitude: number | null;
+  clock_out_longitude: number | null;
+  clock_out_location_name: string | null;
+  work_mode: 'wfh' | 'wfo' | null;
+  employee?: {
+    first_name: string;
+    last_name: string;
+    employee_code: string;
+  };
 }
+
+export interface LocationData {
+  latitude: number;
+  longitude: number;
+  locationName?: string;
+}
+
+export type WorkMode = 'wfh' | 'wfo';
 
 export function useAttendance(month?: Date) {
   const targetMonth = month || new Date();
@@ -23,32 +43,39 @@ export function useAttendance(month?: Date) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendance_records")
-        .select("*")
+        .select(`
+          *,
+          employee:employees(first_name, last_name, employee_code)
+        `)
         .gte("date", start)
         .lte("date", end)
         .order("date", { ascending: false });
 
       if (error) throw error;
-      return data as AttendanceRecord[];
+      return (data || []) as unknown as AttendanceRecord[];
     },
   });
 }
 
-export function useTodayAttendance() {
+export function useTodayAttendance(employeeId?: string) {
   const today = format(new Date(), "yyyy-MM-dd");
 
   return useQuery({
-    queryKey: ["attendance-today", today],
+    queryKey: ["attendance-today", today, employeeId],
     queryFn: async () => {
+      if (!employeeId) return null;
+      
       const { data, error } = await supabase
         .from("attendance_records")
         .select("*")
         .eq("date", today)
+        .eq("employee_id", employeeId)
         .maybeSingle();
 
       if (error) throw error;
-      return data as AttendanceRecord | null;
+      return data as unknown as AttendanceRecord | null;
     },
+    enabled: !!employeeId,
   });
 }
 
@@ -56,7 +83,7 @@ export function useClockIn() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (employeeId: string) => {
+    mutationFn: async ({ employeeId, location, workMode }: { employeeId: string; location?: LocationData; workMode?: WorkMode }) => {
       const today = format(new Date(), "yyyy-MM-dd");
       const now = new Date().toISOString();
 
@@ -67,7 +94,11 @@ export function useClockIn() {
           date: today,
           clock_in: now,
           status: "present",
-        })
+          clock_in_latitude: location?.latitude,
+          clock_in_longitude: location?.longitude,
+          clock_in_location_name: location?.locationName,
+          work_mode: workMode,
+        } as any)
         .select()
         .single();
 
@@ -85,7 +116,7 @@ export function useClockOut() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ recordId, clockIn }: { recordId: string; clockIn: string }) => {
+    mutationFn: async ({ recordId, clockIn, location }: { recordId: string; clockIn: string; location?: LocationData }) => {
       const now = new Date();
       const clockInTime = new Date(clockIn);
       const totalHours = (now.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
@@ -95,7 +126,10 @@ export function useClockOut() {
         .update({
           clock_out: now.toISOString(),
           total_hours: Math.round(totalHours * 100) / 100,
-        })
+          clock_out_latitude: location?.latitude,
+          clock_out_longitude: location?.longitude,
+          clock_out_location_name: location?.locationName,
+        } as any)
         .eq("id", recordId)
         .select()
         .single();
@@ -162,7 +196,7 @@ export function useAttendanceReport(month: Date) {
         }
 
         const empData = employeeMap.get(key)!;
-        empData.records.push(record);
+        empData.records.push(record as unknown as AttendanceRecord);
         empData.totalDays++;
         empData.totalHours += record.total_hours || 0;
         if (record.status === "present") empData.presentDays++;

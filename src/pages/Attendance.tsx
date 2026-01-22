@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, LogIn, LogOut, Calendar, Briefcase, Timer, AlertTriangle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Clock, LogIn, LogOut, Calendar, Briefcase, Timer, AlertTriangle, MapPin, Loader2, Home, Building2 } from "lucide-react";
 import { usePagination } from "@/hooks/usePagination";
 import { useSorting } from "@/hooks/useSorting";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
@@ -20,7 +21,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
-import { useAttendance, useTodayAttendance, useClockIn, useClockOut, useAttendanceReport } from "@/hooks/useAttendance";
+import { useAttendance, useTodayAttendance, useClockIn, useClockOut, useAttendanceReport, LocationData, WorkMode } from "@/hooks/useAttendance";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -58,16 +59,11 @@ const Attendance = () => {
   const { user } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [workMode, setWorkMode] = useState<WorkMode>('wfo');
 
   const targetDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), 1);
 
-  const { data: todayRecord, isLoading: todayLoading } = useTodayAttendance();
-  const { data: attendanceRecords, isLoading: recordsLoading } = useAttendance(targetDate);
-  const { data: reportData, isLoading: reportLoading } = useAttendanceReport(targetDate);
-  const clockIn = useClockIn();
-  const clockOut = useClockOut();
-
-  // Get current employee with working schedule
+  // Get current employee with working schedule - fetch first
   const { data: currentEmployee } = useQuery({
     queryKey: ["current-employee-schedule"],
     queryFn: async () => {
@@ -83,6 +79,12 @@ const Attendance = () => {
     enabled: !!user,
   });
 
+  // Now fetch today's attendance for the current employee specifically
+  const { data: todayRecord, isLoading: todayLoading } = useTodayAttendance(currentEmployee?.id);
+  const { data: attendanceRecords, isLoading: recordsLoading } = useAttendance(targetDate);
+  const { data: reportData, isLoading: reportLoading } = useAttendanceReport(targetDate);
+  const clockIn = useClockIn();
+  const clockOut = useClockOut();
   // Format time for display (e.g., "09:00:00" -> "9:00 AM")
   const formatTimeDisplay = (time: string | null): string => {
     if (!time) return "--:--";
@@ -173,15 +175,97 @@ const Attendance = () => {
   // Pagination for attendance history (uses sorted items)
   const historyPagination = usePagination(historySorting.sortedItems, { initialPageSize: 10 });
 
-  const handleClockIn = async () => {
+  // Get current location
+  const getCurrentLocation = (): Promise<LocationData | undefined> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        toast.error("Geolocation is not supported by your browser");
+        resolve(undefined);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          // Try to get location name via reverse geocoding
+          let locationName: string | undefined;
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+            );
+            const data = await response.json();
+            if (data.address) {
+              // Build a readable address with city
+              const addr = data.address;
+              const parts: string[] = [];
+              
+              // Add street-level detail
+              if (addr.road) parts.push(addr.road);
+              else if (addr.neighbourhood) parts.push(addr.neighbourhood);
+              else if (addr.suburb) parts.push(addr.suburb);
+              
+              // Add area/locality
+              if (addr.suburb && !parts.includes(addr.suburb)) parts.push(addr.suburb);
+              else if (addr.neighbourhood && !parts.includes(addr.neighbourhood)) parts.push(addr.neighbourhood);
+              
+              // Add city
+              const city = addr.city || addr.town || addr.village || addr.municipality || addr.county;
+              if (city) parts.push(city);
+              
+              // Add state if different from city
+              if (addr.state && addr.state !== city) parts.push(addr.state);
+              
+              locationName = parts.slice(0, 4).join(", ");
+            } else if (data.display_name) {
+              // Fallback to display_name
+              const parts = data.display_name.split(", ");
+              locationName = parts.slice(0, 4).join(", ");
+            }
+          } catch (error) {
+            console.error("Failed to get location name:", error);
+          }
+
+          resolve({ latitude, longitude, locationName });
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              toast.error("Location permission denied. Please enable location access.");
+              break;
+            case error.POSITION_UNAVAILABLE:
+              toast.error("Location information is unavailable.");
+              break;
+            case error.TIMEOUT:
+              toast.error("Location request timed out.");
+              break;
+            default:
+              toast.error("Failed to get location.");
+          }
+          resolve(undefined);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
+    });
+  };
+
+  const handleClockIn = async (mode: WorkMode) => {
     if (!currentEmployee) {
       toast.error("Employee profile not found");
       return;
     }
 
     try {
-      await clockIn.mutateAsync(currentEmployee.id);
-      toast.success("Clocked in successfully");
+      toast.info("Getting your location...");
+      const location = await getCurrentLocation();
+      await clockIn.mutateAsync({ employeeId: currentEmployee.id, location, workMode: mode });
+      const modeLabel = mode === 'wfh' ? 'Work From Home' : 'Work From Office';
+      toast.success(`Clocked in (${modeLabel})${location ? ' with location' : ''}`);
     } catch (error) {
       toast.error("Failed to clock in");
     }
@@ -194,8 +278,10 @@ const Attendance = () => {
     }
 
     try {
-      await clockOut.mutateAsync({ recordId: todayRecord.id, clockIn: todayRecord.clock_in });
-      toast.success("Clocked out successfully");
+      toast.info("Getting your location...");
+      const location = await getCurrentLocation();
+      await clockOut.mutateAsync({ recordId: todayRecord.id, clockIn: todayRecord.clock_in, location });
+      toast.success(location ? "Clocked out with location" : "Clocked out successfully");
     } catch (error) {
       toast.error("Failed to clock out");
     }
@@ -326,62 +412,135 @@ const Attendance = () => {
             {todayLoading ? (
               <Skeleton className="h-20 w-full" />
             ) : (
-              <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-                <div className="flex flex-col gap-2 text-center sm:text-left">
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Clock In</p>
-                      <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+                  <div className="flex flex-col gap-2 text-center sm:text-left">
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Clock In</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg font-semibold">
+                            {todayRecord?.clock_in
+                              ? format(new Date(todayRecord.clock_in), "hh:mm a")
+                              : "--:--"}
+                          </p>
+                          {todayRecord?.clock_in && calculateLateArrival(todayRecord.clock_in) > 0 && (
+                            <Badge variant="destructive" className="text-xs">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              {formatLateDuration(calculateLateArrival(todayRecord.clock_in))} late
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Clock Out</p>
                         <p className="text-lg font-semibold">
-                          {todayRecord?.clock_in
-                            ? format(new Date(todayRecord.clock_in), "hh:mm a")
+                          {todayRecord?.clock_out
+                            ? format(new Date(todayRecord.clock_out), "hh:mm a")
                             : "--:--"}
                         </p>
-                        {todayRecord?.clock_in && calculateLateArrival(todayRecord.clock_in) > 0 && (
-                          <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-xs">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            {formatLateDuration(calculateLateArrival(todayRecord.clock_in))} late
-                          </Badge>
-                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Hours</p>
+                        <p className="text-lg font-semibold">
+                          {todayRecord?.total_hours
+                            ? `${todayRecord.total_hours.toFixed(2)} hrs`
+                            : "--"}
+                        </p>
                       </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Clock Out</p>
-                      <p className="text-lg font-semibold">
-                        {todayRecord?.clock_out
-                          ? format(new Date(todayRecord.clock_out), "hh:mm a")
-                          : "--:--"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Hours</p>
-                      <p className="text-lg font-semibold">
-                        {todayRecord?.total_hours
-                          ? `${todayRecord.total_hours.toFixed(2)} hrs`
-                          : "--"}
-                      </p>
-                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3 items-center sm:items-end">
+                    {!isClockedIn && !todayRecord?.clock_out && (
+                      <div className="flex flex-col gap-2">
+                        <p className="text-xs text-muted-foreground text-center sm:text-right">Select work mode:</p>
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={() => handleClockIn('wfo')} 
+                            disabled={clockIn.isPending}
+                            variant="default"
+                          >
+                            {clockIn.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Building2 className="mr-2 h-4 w-4" />
+                            )}
+                            Office
+                          </Button>
+                          <Button 
+                            onClick={() => handleClockIn('wfh')} 
+                            disabled={clockIn.isPending}
+                            variant="secondary"
+                          >
+                            {clockIn.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Home className="mr-2 h-4 w-4" />
+                            )}
+                            Home
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {isClockedIn && (
+                      <div className="flex items-center gap-2">
+                        {todayRecord?.work_mode && (
+                          <Badge variant={todayRecord.work_mode === 'wfo' ? 'default' : 'secondary'}>
+                            {todayRecord.work_mode === 'wfo' ? (
+                              <><Building2 className="h-3 w-3 mr-1" /> Office</>
+                            ) : (
+                              <><Home className="h-3 w-3 mr-1" /> Home</>
+                            )}
+                          </Badge>
+                        )}
+                        <Button onClick={handleClockOut} variant="outline" disabled={clockOut.isPending}>
+                          {clockOut.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <LogOut className="mr-2 h-4 w-4" />
+                          )}
+                          Clock Out
+                        </Button>
+                      </div>
+                    )}
+                    {todayRecord?.clock_out && (
+                      <div className="flex items-center gap-2">
+                        {todayRecord?.work_mode && (
+                          <Badge variant={todayRecord.work_mode === 'wfo' ? 'default' : 'secondary'}>
+                            {todayRecord.work_mode === 'wfo' ? (
+                              <><Building2 className="h-3 w-3 mr-1" /> Office</>
+                            ) : (
+                              <><Home className="h-3 w-3 mr-1" /> Home</>
+                            )}
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-sm">
+                          Completed for today
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  {!isClockedIn && !todayRecord?.clock_out && (
-                    <Button onClick={handleClockIn} disabled={clockIn.isPending}>
-                      <LogIn className="mr-2 h-4 w-4" />
-                      Clock In
-                    </Button>
-                  )}
-                  {isClockedIn && (
-                    <Button onClick={handleClockOut} variant="secondary" disabled={clockOut.isPending}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Clock Out
-                    </Button>
-                  )}
-                  {todayRecord?.clock_out && (
-                    <Badge variant="outline" className="text-sm">
-                      Completed for today
-                    </Badge>
-                  )}
-                </div>
+                
+                {/* Location Display */}
+                {(todayRecord?.clock_in_location_name || todayRecord?.clock_out_location_name) && (
+                  <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                    {todayRecord?.clock_in_location_name && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-3.5 w-3.5 text-primary" />
+                        <span>Clock In:</span>
+                        <span className="text-foreground">{todayRecord.clock_in_location_name}</span>
+                      </div>
+                    )}
+                    {todayRecord?.clock_out_location_name && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-3.5 w-3.5 text-primary" />
+                        <span>Clock Out:</span>
+                        <span className="text-foreground">{todayRecord.clock_out_location_name}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -644,7 +803,7 @@ const Attendance = () => {
               <Skeleton className="h-64 w-full" />
             ) : attendanceRecords && attendanceRecords.length > 0 ? (
             <>
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -656,6 +815,7 @@ const Attendance = () => {
                       >
                         Date
                       </SortableTableHead>
+                      <TableHead>Employee</TableHead>
                       <TableHead>Clock In</TableHead>
                       <TableHead>Clock Out</TableHead>
                       <SortableTableHead
@@ -667,6 +827,8 @@ const Attendance = () => {
                         Total Hours
                       </SortableTableHead>
                       <TableHead>Overtime</TableHead>
+                      <TableHead>Mode</TableHead>
+                      <TableHead>Location</TableHead>
                       <SortableTableHead
                         sortKey="status"
                         currentSortKey={historySorting.sortConfig.key as string | null}
@@ -685,10 +847,22 @@ const Attendance = () => {
                         <TableRow key={record.id}>
                           <TableCell>{format(new Date(record.date), "MMM d, yyyy")}</TableCell>
                           <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {record.employee 
+                                  ? `${record.employee.first_name} ${record.employee.last_name}` 
+                                  : "-"}
+                              </span>
+                              {record.employee?.employee_code && (
+                                <span className="text-xs text-muted-foreground">{record.employee.employee_code}</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
                             <div className="flex items-center gap-2">
                               {record.clock_in ? format(new Date(record.clock_in), "hh:mm a") : "-"}
                               {lateMinutes > 0 && (
-                                <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-xs">
+                                <Badge variant="destructive" className="text-xs">
                                   <AlertTriangle className="h-3 w-3 mr-1" />
                                   {formatLateDuration(lateMinutes)} late
                                 </Badge>
@@ -703,11 +877,66 @@ const Attendance = () => {
                           </TableCell>
                           <TableCell>
                             {overtime > 0 ? (
-                              <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">
+                              <Badge variant="secondary" className="text-xs">
                                 +{overtime.toFixed(2)} hrs
                               </Badge>
                             ) : (
                               <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {record.work_mode ? (
+                              <Badge variant={record.work_mode === 'wfo' ? 'default' : 'secondary'} className="text-xs">
+                                {record.work_mode === 'wfo' ? (
+                                  <><Building2 className="h-3 w-3 mr-1" /> Office</>
+                                ) : (
+                                  <><Home className="h-3 w-3 mr-1" /> Home</>
+                                )}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {(record.clock_in_location_name || record.clock_out_location_name) ? (
+                              <TooltipProvider>
+                                <div className="flex flex-col gap-1 max-w-[200px]">
+                                  {record.clock_in_location_name && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="flex items-start gap-1.5 text-xs cursor-help">
+                                          <MapPin className="h-3 w-3 text-primary shrink-0 mt-0.5" />
+                                          <span className="text-muted-foreground truncate">
+                                            In: {record.clock_in_location_name}
+                                          </span>
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-[300px]">
+                                        <p className="text-sm font-medium">Clock In Location</p>
+                                        <p className="text-xs text-muted-foreground">{record.clock_in_location_name}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {record.clock_out_location_name && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="flex items-start gap-1.5 text-xs cursor-help">
+                                          <MapPin className="h-3 w-3 text-primary shrink-0 mt-0.5" />
+                                          <span className="text-muted-foreground truncate">
+                                            Out: {record.clock_out_location_name}
+                                          </span>
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-[300px]">
+                                        <p className="text-sm font-medium">Clock Out Location</p>
+                                        <p className="text-xs text-muted-foreground">{record.clock_out_location_name}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
+                              </TooltipProvider>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
                             )}
                           </TableCell>
                           <TableCell>{getStatusBadge(record.status)}</TableCell>

@@ -140,7 +140,13 @@ export type Database = {
       attendance_records: {
         Row: {
           clock_in: string | null
+          clock_in_latitude: number | null
+          clock_in_location_name: string | null
+          clock_in_longitude: number | null
           clock_out: string | null
+          clock_out_latitude: number | null
+          clock_out_location_name: string | null
+          clock_out_longitude: number | null
           created_at: string
           date: string
           employee_id: string
@@ -149,10 +155,17 @@ export type Database = {
           status: string
           total_hours: number | null
           updated_at: string
+          work_mode: string | null
         }
         Insert: {
           clock_in?: string | null
+          clock_in_latitude?: number | null
+          clock_in_location_name?: string | null
+          clock_in_longitude?: number | null
           clock_out?: string | null
+          clock_out_latitude?: number | null
+          clock_out_location_name?: string | null
+          clock_out_longitude?: number | null
           created_at?: string
           date?: string
           employee_id: string
@@ -161,10 +174,17 @@ export type Database = {
           status?: string
           total_hours?: number | null
           updated_at?: string
+          work_mode?: string | null
         }
         Update: {
           clock_in?: string | null
+          clock_in_latitude?: number | null
+          clock_in_location_name?: string | null
+          clock_in_longitude?: number | null
           clock_out?: string | null
+          clock_out_latitude?: number | null
+          clock_out_location_name?: string | null
+          clock_out_longitude?: number | null
           created_at?: string
           date?: string
           employee_id?: string
@@ -173,6 +193,7 @@ export type Database = {
           status?: string
           total_hours?: number | null
           updated_at?: string
+          work_mode?: string | null
         }
         Relationships: [
           {
@@ -698,6 +719,30 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      organization_settings: {
+        Row: {
+          created_at: string
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          setting_key: string
+          setting_value?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string
         }
         Relationships: []
       }
