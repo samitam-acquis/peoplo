@@ -294,7 +294,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
   }, [employeeDetails]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: EditFormData) => {
+    mutationFn: async ({ data, isDeptManager }: { data: EditFormData; isDeptManager: boolean }) => {
       const { error } = await supabase
         .from("employees")
         .update({
@@ -321,9 +321,30 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
         .eq("id", employee?.id);
 
       if (error) throw error;
+
+      // Update department manager status if employee has a department
+      if (data.department_id) {
+        if (isDeptManager) {
+          // Set this employee as the department manager
+          const { error: deptError } = await supabase
+            .from("departments")
+            .update({ manager_id: employee?.id })
+            .eq("id", data.department_id);
+          if (deptError) throw deptError;
+        } else {
+          // Remove this employee as department manager if they were previously set
+          const { error: deptError } = await supabase
+            .from("departments")
+            .update({ manager_id: null })
+            .eq("id", data.department_id)
+            .eq("manager_id", employee?.id);
+          if (deptError) throw deptError;
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
     },
     onError: (error) => {
       toast.error(`Failed to update employee: ${error.message}`);
@@ -377,8 +398,8 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
     }
 
     try {
-      // Update employee details
-      await updateMutation.mutateAsync(formData);
+      // Update employee details and department manager status
+      await updateMutation.mutateAsync({ data: formData, isDeptManager: isDepartmentManager });
       
       // Update salary structure if basic salary is provided
       if (salaryData.basic_salary) {
