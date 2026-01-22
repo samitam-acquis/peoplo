@@ -8,7 +8,7 @@ import { PendingApprovalsWidget } from "@/components/dashboard/PendingApprovalsW
 import { TeamLeaveCalendar } from "@/components/dashboard/TeamLeaveCalendar";
 import { NonEmployeeDashboard } from "@/components/dashboard/NonEmployeeDashboard";
 import { UpdateNotification } from "@/components/dashboard/UpdateNotification";
-import { Users, Calendar, Package, CreditCard, ClipboardCheck } from "lucide-react";
+import { Users, Calendar, Package, CreditCard, ClipboardCheck, CalendarDays, CalendarCheck } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useEmployeeStatus } from "@/hooks/useEmployeeStatus";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
@@ -81,7 +81,7 @@ const Index = () => {
         </h1>
 
         {/* Stats Grid */}
-        <div className={`grid gap-4 sm:grid-cols-2 ${isAdminOrHR ? (hasPendingApprovals ? 'lg:grid-cols-5' : 'lg:grid-cols-4') : (hasPendingApprovals ? 'lg:grid-cols-3' : 'lg:grid-cols-2')}`}>
+        <div className={`grid gap-4 sm:grid-cols-2 ${isAdminOrHR ? (hasPendingApprovals ? 'lg:grid-cols-5' : 'lg:grid-cols-4') : (hasPendingApprovals ? 'lg:grid-cols-5' : 'lg:grid-cols-4')}`}>
           {isLoading ? (
             <>
               {[1, 2, 3, 4].map((i) => (
@@ -124,6 +124,18 @@ const Index = () => {
               {!isAdminOrHR && (
                 <>
                   <StatsCard
+                    title="Available Leaves"
+                    value={String(stats?.availableLeaves || 0)}
+                    icon={<CalendarDays className="h-6 w-6" />}
+                    variant="primary"
+                  />
+                  <StatsCard
+                    title="Leaves Taken"
+                    value={`${stats?.usedLeaves || 0} / ${stats?.totalLeaves || 0}`}
+                    icon={<CalendarCheck className="h-6 w-6" />}
+                    variant="default"
+                  />
+                  <StatsCard
                     title={stats?.onLeaveToday ? "You're On Leave" : "Leave Status"}
                     value={stats?.onLeaveToday ? "On Leave" : "Working"}
                     icon={<Calendar className="h-6 w-6" />}
@@ -133,7 +145,7 @@ const Index = () => {
                     title="My Assets"
                     value={String(stats?.assetsAssigned || 0)}
                     icon={<Package className="h-6 w-6" />}
-                    variant="primary"
+                    variant="success"
                   />
                 </>
               )}
