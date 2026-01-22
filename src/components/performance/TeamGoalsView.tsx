@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Target, Loader2, Calendar, Users } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Target, Loader2, Calendar, Users, Save, Check } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface TeamGoalsViewProps {
   managerId: string;
@@ -46,6 +48,9 @@ const priorityColors: Record<string, string> = {
 
 export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
+  const [editingGoal, setEditingGoal] = useState<string | null>(null);
+  const [pendingProgress, setPendingProgress] = useState<Record<string, number>>({});
+  const queryClient = useQueryClient();
 
   const { data: teamData, isLoading } = useQuery({
     queryKey: ["team-goals", managerId],
@@ -79,6 +84,66 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
     },
     enabled: !!managerId,
   });
+
+  const updateProgressMutation = useMutation({
+    mutationFn: async ({ goalId, progress, status }: { goalId: string; progress: number; status: string }) => {
+      const { error } = await supabase
+        .from("goals")
+        .update({ 
+          progress, 
+          status,
+          completed_at: status === "completed" ? new Date().toISOString() : null 
+        })
+        .eq("id", goalId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["team-goals", managerId] });
+      toast.success("Goal progress updated");
+      setEditingGoal(null);
+    },
+    onError: (error) => {
+      toast.error("Failed to update progress: " + error.message);
+    },
+  });
+
+  const handleProgressChange = (goalId: string, value: number[]) => {
+    setPendingProgress(prev => ({ ...prev, [goalId]: value[0] }));
+  };
+
+  const handleSaveProgress = (goalId: string, currentStatus: string) => {
+    const progress = pendingProgress[goalId];
+    if (progress === undefined) return;
+
+    let newStatus = currentStatus;
+    if (progress === 100) {
+      newStatus = "completed";
+    } else if (progress > 0 && currentStatus === "not_started") {
+      newStatus = "in_progress";
+    }
+
+    updateProgressMutation.mutate({ goalId, progress, status: newStatus });
+    setPendingProgress(prev => {
+      const updated = { ...prev };
+      delete updated[goalId];
+      return updated;
+    });
+  };
+
+  const startEditing = (goalId: string, currentProgress: number) => {
+    setEditingGoal(goalId);
+    setPendingProgress(prev => ({ ...prev, [goalId]: currentProgress }));
+  };
+
+  const cancelEditing = (goalId: string) => {
+    setEditingGoal(null);
+    setPendingProgress(prev => {
+      const updated = { ...prev };
+      delete updated[goalId];
+      return updated;
+    });
+  };
 
   if (isLoading) {
     return (
@@ -197,10 +262,52 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Progress value={goal.progress} className="h-2 flex-1" />
-                        <span className="text-xs font-medium w-10 text-right">{goal.progress}%</span>
-                      </div>
+                      {editingGoal === goal.id ? (
+                        <div className="flex items-center gap-2">
+                          <Slider
+                            value={[pendingProgress[goal.id] ?? goal.progress]}
+                            onValueChange={(value) => handleProgressChange(goal.id, value)}
+                            max={100}
+                            step={5}
+                            className="flex-1"
+                          />
+                          <span className="text-xs font-medium w-10 text-right">
+                            {pendingProgress[goal.id] ?? goal.progress}%
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                            onClick={() => handleSaveProgress(goal.id, goal.status)}
+                            disabled={updateProgressMutation.isPending}
+                          >
+                            <Check className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                            onClick={() => cancelEditing(goal.id)}
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      ) : (
+                        <div 
+                          className="flex items-center gap-2 cursor-pointer group"
+                          onClick={() => startEditing(goal.id, goal.progress)}
+                          title="Click to edit progress"
+                        >
+                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary transition-all" 
+                              style={{ width: `${goal.progress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium w-10 text-right">{goal.progress}%</span>
+                          <Save className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
