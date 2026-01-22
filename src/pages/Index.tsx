@@ -1,7 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
-import { LeaveCalendar } from "@/components/dashboard/LeaveCalendar";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { PerformanceWidget } from "@/components/dashboard/PerformanceWidget";
 import { PendingApprovalsWidget } from "@/components/dashboard/PendingApprovalsWidget";
@@ -9,6 +8,7 @@ import { TeamLeaveCalendar } from "@/components/dashboard/TeamLeaveCalendar";
 import { NonEmployeeDashboard } from "@/components/dashboard/NonEmployeeDashboard";
 import { UpdateNotification } from "@/components/dashboard/UpdateNotification";
 import { WhosOut } from "@/components/dashboard/WhosOut";
+import { UpcomingCelebrations } from "@/components/dashboard/UpcomingCelebrations";
 import { Users, Calendar, Package, CreditCard, ClipboardCheck, CalendarDays } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useEmployeeStatus } from "@/hooks/useEmployeeStatus";
@@ -174,6 +174,7 @@ const Index = () => {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            <UpcomingCelebrations />
             <PendingApprovalsWidget />
             <TeamLeaveCalendar />
             <QuickActions />
