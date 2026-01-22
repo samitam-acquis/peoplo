@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -14,10 +13,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Star, FileText, Loader2, Plus, Users, CheckCircle } from "lucide-react";
+import { Star, FileText, Loader2, Plus, Users, CheckCircle, Edit2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCreateReview } from "@/hooks/usePerformance";
+import { useCreateReview, useUpdateReview } from "@/hooks/usePerformance";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -40,6 +39,9 @@ interface TeamReview {
   review_period: string;
   review_date: string;
   overall_rating: number | null;
+  strengths: string | null;
+  areas_for_improvement: string | null;
+  comments: string | null;
   status: string;
   employee: {
     first_name: string;
@@ -56,6 +58,7 @@ const statusColors: Record<string, string> = {
 export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManagerProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<TeamMember | null>(null);
+  const [editingReview, setEditingReview] = useState<TeamReview | null>(null);
   const [formData, setFormData] = useState({
     review_period: "",
     overall_rating: 0,
@@ -65,6 +68,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
   });
 
   const createReviewMutation = useCreateReview();
+  const updateReviewMutation = useUpdateReview();
 
   // Get team members
   const { data: teamMembers, isLoading: teamLoading } = useQuery({
@@ -91,7 +95,8 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
       const { data, error } = await supabase
         .from("performance_reviews")
         .select(`
-          id, employee_id, review_period, review_date, overall_rating, status,
+          id, employee_id, review_period, review_date, overall_rating, strengths, 
+          areas_for_improvement, comments, status,
           employee:employees!performance_reviews_employee_id_fkey (first_name, last_name)
         `)
         .eq("reviewer_id", managerId)
@@ -104,8 +109,22 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
   });
 
   const isLoading = teamLoading || reviewsLoading;
+  const isPending = createReviewMutation.isPending || updateReviewMutation.isPending;
+
+  const resetForm = () => {
+    setFormData({
+      review_period: "",
+      overall_rating: 0,
+      strengths: "",
+      areas_for_improvement: "",
+      comments: "",
+    });
+    setEditingReview(null);
+    setSelectedEmployee(null);
+  };
 
   const openCreateDialog = (employee: TeamMember) => {
+    resetForm();
     setSelectedEmployee(employee);
     setFormData({
       review_period: `Q${Math.ceil((new Date().getMonth() + 1) / 3)} ${new Date().getFullYear()}`,
@@ -117,6 +136,25 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
     setIsDialogOpen(true);
   };
 
+  const openEditDialog = (review: TeamReview) => {
+    setEditingReview(review);
+    setSelectedEmployee({
+      id: review.employee_id,
+      first_name: review.employee.first_name,
+      last_name: review.employee.last_name,
+      designation: "",
+      avatar_url: null,
+    });
+    setFormData({
+      review_period: review.review_period,
+      overall_rating: review.overall_rating || 0,
+      strengths: review.strengths || "",
+      areas_for_improvement: review.areas_for_improvement || "",
+      comments: review.comments || "",
+    });
+    setIsDialogOpen(true);
+  };
+
   const handleSubmit = async (status: "draft" | "submitted") => {
     if (!selectedEmployee) return;
     if (!formData.review_period.trim()) {
@@ -124,21 +162,35 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
       return;
     }
 
-    await createReviewMutation.mutateAsync({
-      employee_id: selectedEmployee.id,
-      reviewer_id: managerId,
-      reviewer_name: managerName,
-      review_period: formData.review_period,
-      review_date: new Date().toISOString().split("T")[0],
-      overall_rating: formData.overall_rating || null,
-      strengths: formData.strengths || undefined,
-      areas_for_improvement: formData.areas_for_improvement || undefined,
-      comments: formData.comments || undefined,
-      status,
-    });
+    if (editingReview) {
+      // Update existing review
+      await updateReviewMutation.mutateAsync({
+        id: editingReview.id,
+        review_period: formData.review_period,
+        overall_rating: formData.overall_rating || null,
+        strengths: formData.strengths || undefined,
+        areas_for_improvement: formData.areas_for_improvement || undefined,
+        comments: formData.comments || undefined,
+        status,
+      });
+    } else {
+      // Create new review
+      await createReviewMutation.mutateAsync({
+        employee_id: selectedEmployee.id,
+        reviewer_id: managerId,
+        reviewer_name: managerName,
+        review_period: formData.review_period,
+        review_date: new Date().toISOString().split("T")[0],
+        overall_rating: formData.overall_rating || null,
+        strengths: formData.strengths || undefined,
+        areas_for_improvement: formData.areas_for_improvement || undefined,
+        comments: formData.comments || undefined,
+        status,
+      });
+    }
 
     setIsDialogOpen(false);
-    setSelectedEmployee(null);
+    resetForm();
   };
 
   const renderStars = (rating: number, interactive = false, onChange?: (rating: number) => void) => {
@@ -187,6 +239,10 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
     );
   }
 
+  // Separate draft reviews from others
+  const draftReviews = teamReviews?.filter(r => r.status === "draft") || [];
+  const otherReviews = teamReviews?.filter(r => r.status !== "draft") || [];
+
   return (
     <>
       <Card>
@@ -230,12 +286,52 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
             </div>
           </div>
 
-          {/* Recent Reviews */}
-          {teamReviews && teamReviews.length > 0 && (
+          {/* Draft Reviews - Editable */}
+          {draftReviews.length > 0 && (
             <div className="space-y-3">
-              <h4 className="font-medium text-sm text-muted-foreground">Recent Reviews</h4>
+              <h4 className="font-medium text-sm text-muted-foreground">Draft Reviews</h4>
               <div className="space-y-2">
-                {teamReviews.slice(0, 5).map(review => (
+                {draftReviews.map(review => (
+                  <div 
+                    key={review.id} 
+                    className="flex items-center justify-between p-3 rounded-lg border border-dashed"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <p className="font-medium text-sm">
+                          {review.employee.first_name} {review.employee.last_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {review.review_period} • {format(new Date(review.review_date), "MMM d, yyyy")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {review.overall_rating && renderStars(review.overall_rating)}
+                      <Badge variant="outline" className={statusColors[review.status]}>
+                        {review.status}
+                      </Badge>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => openEditDialog(review)}
+                      >
+                        <Edit2 className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Submitted/Acknowledged Reviews */}
+          {otherReviews.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="font-medium text-sm text-muted-foreground">Submitted Reviews</h4>
+              <div className="space-y-2">
+                {otherReviews.slice(0, 5).map(review => (
                   <div 
                     key={review.id} 
                     className="flex items-center justify-between p-3 rounded-lg border"
@@ -265,12 +361,15 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
         </CardContent>
       </Card>
 
-      {/* Create Review Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      {/* Create/Edit Review Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        setIsDialogOpen(open);
+        if (!open) resetForm();
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              Create Review for {selectedEmployee?.first_name} {selectedEmployee?.last_name}
+              {editingReview ? "Edit" : "Create"} Review for {selectedEmployee?.first_name} {selectedEmployee?.last_name}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -327,15 +426,15 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
             <Button 
               variant="secondary"
               onClick={() => handleSubmit("draft")}
-              disabled={createReviewMutation.isPending}
+              disabled={isPending}
             >
-              Save as Draft
+              {editingReview ? "Save Draft" : "Save as Draft"}
             </Button>
             <Button 
               onClick={() => handleSubmit("submitted")}
-              disabled={createReviewMutation.isPending}
+              disabled={isPending}
             >
-              {createReviewMutation.isPending && (
+              {isPending && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
               Submit Review

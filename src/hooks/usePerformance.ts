@@ -221,6 +221,41 @@ export function useCreateReview() {
   });
 }
 
+export function useUpdateReview() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      id, 
+      ...updates 
+    }: { 
+      id: string;
+      review_period?: string;
+      overall_rating?: number | null;
+      strengths?: string;
+      areas_for_improvement?: string;
+      comments?: string;
+      status?: string;
+    }) => {
+      const { error } = await supabase
+        .from("performance_reviews")
+        .update(updates)
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["performance-reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["all-performance-reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["team-reviews-by-manager"] });
+      toast.success("Review updated successfully");
+    },
+    onError: (error) => {
+      toast.error("Failed to update review: " + error.message);
+    },
+  });
+}
+
 export function useAcknowledgeReview() {
   const queryClient = useQueryClient();
 
