@@ -81,7 +81,7 @@ const Index = () => {
         </h1>
 
         {/* Stats Grid */}
-        <div className={`grid gap-4 sm:grid-cols-2 ${isAdminOrHR ? (hasPendingApprovals ? 'lg:grid-cols-5' : 'lg:grid-cols-4') : (hasPendingApprovals ? 'lg:grid-cols-5' : 'lg:grid-cols-4')}`}>
+        <div className={`grid gap-4 sm:grid-cols-2 ${isAdminOrHR ? (hasPendingApprovals ? 'lg:grid-cols-5' : 'lg:grid-cols-4') : (hasPendingApprovals ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}`}>
           {isLoading ? (
             <>
               {[1, 2, 3, 4].map((i) => (
@@ -124,19 +124,13 @@ const Index = () => {
               {!isAdminOrHR && (
                 <>
                   <StatsCard
-                    title="Available Leaves"
-                    value={String(stats?.availableLeaves || 0)}
+                    title="Leave Balance"
+                    value={`${stats?.availableLeaves || 0} / ${stats?.totalLeaves || 0}`}
                     icon={<CalendarDays className="h-6 w-6" />}
                     variant="primary"
                   />
                   <StatsCard
-                    title="Leaves Taken"
-                    value={`${stats?.usedLeaves || 0} / ${stats?.totalLeaves || 0}`}
-                    icon={<CalendarCheck className="h-6 w-6" />}
-                    variant="default"
-                  />
-                  <StatsCard
-                    title={stats?.onLeaveToday ? "You're On Leave" : "Leave Status"}
+                    title={stats?.onLeaveToday ? "You're On Leave" : "Status Today"}
                     value={stats?.onLeaveToday ? "On Leave" : "Working"}
                     icon={<Calendar className="h-6 w-6" />}
                     variant={stats?.onLeaveToday ? "warning" : "success"}
