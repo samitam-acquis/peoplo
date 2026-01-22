@@ -4,6 +4,7 @@ import { format } from "date-fns";
 
 export interface LeaveRequest {
   id: string;
+  employeeId: string;
   employee: {
     name: string;
     avatar?: string;
@@ -15,6 +16,7 @@ export interface LeaveRequest {
   days: number;
   reason: string;
   status: "pending" | "approved" | "rejected" | "cancelled";
+  submittedAt: string;
 }
 
 export function useLeaveRequests() {
@@ -31,6 +33,7 @@ export function useLeaveRequests() {
           reason,
           status,
           employee_id,
+          created_at,
           leave_type:leave_types(name)
         `)
         .order("created_at", { ascending: false });
@@ -59,6 +62,7 @@ export function useLeaveRequests() {
         const emp = employeeMap.get(req.employee_id);
         return {
           id: req.id,
+          employeeId: req.employee_id,
           employee: {
             name: emp ? `${emp.first_name} ${emp.last_name}` : "Unknown",
             avatar: emp?.avatar_url || undefined,
@@ -70,6 +74,7 @@ export function useLeaveRequests() {
           days: req.days_count,
           reason: req.reason || "",
           status: req.status as LeaveRequest["status"],
+          submittedAt: format(new Date(req.created_at), "MMM d, yyyy 'at' h:mm a"),
         };
       });
     },
