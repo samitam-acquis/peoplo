@@ -26,6 +26,7 @@ import { Employee } from "./EmployeeTable";
 import { Loader2, Hash, IndianRupee, History, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import {
   Collapsible,
   CollapsibleContent,
@@ -159,6 +160,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
   });
 
   const [showHistory, setShowHistory] = useState(false);
+  const [isDepartmentManager, setIsDepartmentManager] = useState(false);
 
   // Update salary data when structure is loaded
   useEffect(() => {
@@ -252,10 +254,11 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
     },
   });
 
-  // Check if employee is a department manager (head of any department)
-  const isDepartmentHead = departments.some(
-    (dept) => dept.manager_id === employee?.id
-  );
+  // Initialize isDepartmentManager state based on whether employee is a department head
+  useEffect(() => {
+    const isHead = departments.some((dept) => dept.manager_id === employee?.id);
+    setIsDepartmentManager(isHead);
+  }, [departments, employee?.id]);
 
   // Parse working hours from TIME format (HH:MM:SS) to input format (HH:MM)
   const parseTime = (time: string | null) => {
@@ -368,8 +371,8 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
       toast.error("Please fill in all required fields");
       return;
     }
-    if (!isDepartmentHead && !formData.manager_id) {
-      toast.error("Reporting manager is required for employees who are not department heads");
+    if (!isDepartmentManager && !formData.manager_id) {
+      toast.error("Reporting manager is required for employees who are not department managers");
       return;
     }
 
@@ -607,9 +610,32 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                   </div>
                 </div>
 
+                {/* Department Manager Toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="department-manager" className="text-base font-medium">
+                      Department Manager
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Tag this employee as the head of their department
+                    </p>
+                  </div>
+                  <Switch
+                    id="department-manager"
+                    checked={isDepartmentManager}
+                    onCheckedChange={(checked) => {
+                      setIsDepartmentManager(checked);
+                      // Clear manager_id when toggling on department manager
+                      if (checked) {
+                        setFormData({ ...formData, manager_id: "" });
+                      }
+                    }}
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="manager">
-                    Reporting Manager {!isDepartmentHead && '*'}
+                    Reporting Manager {!isDepartmentManager && '*'}
                   </Label>
                   <Select
                     value={formData.manager_id}
@@ -619,7 +645,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                       <SelectValue placeholder="Select manager" />
                     </SelectTrigger>
                     <SelectContent>
-                      {isDepartmentHead && <SelectItem value="none">No Manager</SelectItem>}
+                      {isDepartmentManager && <SelectItem value="none">No Manager</SelectItem>}
                       {managers
                         .filter((mgr) => mgr.id !== employee?.id)
                         .map((mgr) => (
@@ -629,9 +655,9 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                         ))}
                     </SelectContent>
                   </Select>
-                  {!isDepartmentHead && (
+                  {!isDepartmentManager && (
                     <p className="text-xs text-muted-foreground">
-                      Required for employees who are not department heads
+                      Required for employees who are not department managers
                     </p>
                   )}
                 </div>
