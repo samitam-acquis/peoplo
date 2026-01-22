@@ -111,6 +111,15 @@ VITE_SUPABASE_PUBLISHABLE_KEY="your-anon-key"
 VITE_SUPABASE_URL="https://your-project-id.supabase.co"
 ```
 
+**Where to find these values:**
+1. Go to your [Supabase Dashboard](https://supabase.com/dashboard)
+2. Select your project
+3. Navigate to **Settings > API** (or **Project Settings > API**)
+4. You'll find:
+   - **Project URL** → Use for `VITE_SUPABASE_URL`
+   - **Project Reference ID** → Use for `VITE_SUPABASE_PROJECT_ID` (the alphanumeric string in your project URL)
+   - **anon/public key** → Use for `VITE_SUPABASE_PUBLISHABLE_KEY`
+
 ### 4. Edge Functions Setup
 
 Edge functions are in `supabase/functions/`. Deploy them using Supabase CLI:
@@ -131,15 +140,17 @@ supabase functions deploy
 
 #### Edge Function Secrets
 
-Set these secrets in your Supabase dashboard (Settings > Edge Functions > Secrets):
+Set these secrets in your Supabase dashboard (**Settings > Edge Functions > Secrets**):
 
-| Secret Name | Description |
-|-------------|-------------|
-| `RESEND_API_KEY` | API key from [resend.com](https://resend.com) for email notifications |
-| `SUPABASE_URL` | Your Supabase project URL |
-| `SUPABASE_ANON_KEY` | Your Supabase anon/publishable key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase service role key (Settings > API) |
-| `CRON_SECRET` | Random string for securing cron job endpoints |
+| Secret Name | Description | Where to Find |
+|-------------|-------------|---------------|
+| `RESEND_API_KEY` | API key for email notifications | [resend.com](https://resend.com) → API Keys |
+| `SUPABASE_URL` | Your Supabase project URL | Settings > API → Project URL |
+| `SUPABASE_ANON_KEY` | Your Supabase anon/public key | Settings > API → anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase service role key | Settings > API → service_role key (keep secret!) |
+| `CRON_SECRET` | Random string for cron security | Generate your own (e.g., `openssl rand -hex 32`) |
+
+> **Note:** The `service_role` key has full database access and bypasses RLS. Never expose it in client-side code.
 
 ### 5. Cron Jobs (Optional)
 
