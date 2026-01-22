@@ -2,9 +2,9 @@ name: Deploy to Netlify
 
 on:
   push:
-    branches: [main]
+    branches: [NETLIFY]
   pull_request:
-    branches: [main]
+    branches: [NETLIFY]
   workflow_dispatch:
 
 jobs:
