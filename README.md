@@ -47,7 +47,7 @@ npm install
 
 #### Run Database Migrations
 
-All migrations are in `supabase/migrations/`. Run them in order via the Supabase SQL Editor:
+All migrations are in `supabase/migrations/`. These are **schema-only** migrations that create the database structure without any test data.
 
 1. Go to your Supabase Dashboard > SQL Editor
 2. Run each migration file in chronological order (files are timestamped)
@@ -57,6 +57,26 @@ The migrations will create:
 - Row Level Security (RLS) policies
 - Database functions and triggers
 - Storage buckets for documents
+
+#### Seed Data (Optional)
+
+For development/testing, you can optionally run the seed file to populate sample data:
+
+```bash
+# Using Make (recommended)
+make seed
+
+# Or manually via Supabase SQL Editor
+# Copy contents of supabase/seed.sql and run in SQL Editor
+```
+
+The seed file (`supabase/seed.sql`) includes:
+- Sample departments (Engineering, HR, Finance, etc.)
+- Leave types (Annual, Sick, Casual, etc.)
+- Company holidays (adjust dates as needed)
+- Sample assets for testing
+
+**Note:** Do NOT run seed data on production databases. It's meant for development only.
 
 #### Enable Required Extensions
 
@@ -91,6 +111,15 @@ VITE_SUPABASE_PUBLISHABLE_KEY="your-anon-key"
 VITE_SUPABASE_URL="https://your-project-id.supabase.co"
 ```
 
+**Where to find these values:**
+1. Go to your [Supabase Dashboard](https://supabase.com/dashboard)
+2. Select your project
+3. Navigate to **Settings > API** (or **Project Settings > API**)
+4. You'll find:
+   - **Project URL** → Use for `VITE_SUPABASE_URL`
+   - **Project Reference ID** → Use for `VITE_SUPABASE_PROJECT_ID` (the alphanumeric string in your project URL)
+   - **anon/public key** → Use for `VITE_SUPABASE_PUBLISHABLE_KEY`
+
 ### 4. Edge Functions Setup
 
 Edge functions are in `supabase/functions/`. Deploy them using Supabase CLI:
@@ -111,44 +140,108 @@ supabase functions deploy
 
 #### Edge Function Secrets
 
-Set these secrets in your Supabase dashboard (Settings > Edge Functions > Secrets):
+Set these secrets in your Supabase dashboard (**Settings > Edge Functions > Secrets**):
 
-| Secret Name | Description |
-|-------------|-------------|
-| `RESEND_API_KEY` | API key from [resend.com](https://resend.com) for email notifications |
-| `SUPABASE_URL` | Your Supabase project URL |
-| `SUPABASE_ANON_KEY` | Your Supabase anon/publishable key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase service role key (Settings > API) |
-| `CRON_SECRET` | Random string for securing cron job endpoints |
+| Secret Name | Description | Where to Find |
+|-------------|-------------|---------------|
+| `RESEND_API_KEY` | API key for email notifications | [resend.com](https://resend.com) → API Keys |
+| `SUPABASE_URL` | Your Supabase project URL | Settings > API → Project URL |
+| `SUPABASE_ANON_KEY` | Your Supabase anon/public key | Settings > API → anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase service role key | Settings > API → service_role key (keep secret!) |
+| `CRON_SECRET` | Random string for cron security | Generate your own (e.g., `openssl rand -hex 32`) |
+
+> **Note:** The `service_role` key has full database access and bypasses RLS. Never expose it in client-side code.
 
 ### 5. Cron Jobs (Optional)
 
-For automated reminders, set up cron jobs in SQL Editor:
+For automated reminders and notifications, set up cron jobs manually via the SQL Editor. 
+
+> **Important:** Cron jobs are NOT included in migrations because they contain project-specific URLs and secrets. You must set these up manually after deployment.
+
+#### Prerequisites
+First, enable the required extensions (if not already enabled):
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+```
+
+#### Available Cron Jobs
+
+Replace `your-project-id` with your actual Supabase project ID and `YOUR_CRON_SECRET` with your cron secret.
 
 ```sql
--- Attendance reminders (daily at 9 AM)
+-- 1. Attendance reminders (every 10 min during work hours, Mon-Sat)
 SELECT cron.schedule(
-  'attendance-reminder',
-  '0 9 * * *',
+  'attendance-reminders-job',
+  '*/10 8-19 * * 1-6',
   $$
   SELECT net.http_post(
     url:='https://your-project-id.supabase.co/functions/v1/attendance-reminders',
-    headers:='{"Authorization": "Bearer YOUR_CRON_SECRET"}'::jsonb
+    headers:=jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer YOUR_CRON_SECRET'
+    ),
+    body:='{}'::jsonb
   );
   $$
 );
 
--- Goal reminders (weekly on Monday)
+-- 2. Goal reminders (daily at 9 AM UTC)
 SELECT cron.schedule(
-  'goal-reminder',
-  '0 9 * * 1',
+  'daily-goal-reminders',
+  '0 9 * * *',
   $$
   SELECT net.http_post(
     url:='https://your-project-id.supabase.co/functions/v1/goal-reminders',
-    headers:='{"Authorization": "Bearer YOUR_CRON_SECRET"}'::jsonb
+    headers:=jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer YOUR_CRON_SECRET'
+    ),
+    body:='{}'::jsonb
   );
   $$
 );
+
+-- 3. Onboarding reminders (daily at 9 AM UTC)
+SELECT cron.schedule(
+  'onboarding-reminders-daily',
+  '0 9 * * *',
+  $$
+  SELECT net.http_post(
+    url:='https://your-project-id.supabase.co/functions/v1/onboarding-reminders',
+    headers:=jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer YOUR_CRON_SECRET'
+    ),
+    body:='{}'::jsonb
+  );
+  $$
+);
+
+-- 4. Weekly event notifications (every Monday at 8 AM UTC)
+SELECT cron.schedule(
+  'weekly-event-notifications',
+  '0 8 * * 1',
+  $$
+  SELECT net.http_post(
+    url:='https://your-project-id.supabase.co/functions/v1/event-notification',
+    headers:=jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer YOUR_CRON_SECRET'
+    ),
+    body:='{}'::jsonb
+  );
+  $$
+);
+```
+
+#### Managing Cron Jobs
+```sql
+-- View all scheduled jobs
+SELECT * FROM cron.job;
+
+-- Unschedule a job by name
+SELECT cron.unschedule('job-name');
 ```
 
 ### 6. Run Locally
