@@ -47,7 +47,7 @@ npm install
 
 #### Run Database Migrations
 
-All migrations are in `supabase/migrations/`. Run them in order via the Supabase SQL Editor:
+All migrations are in `supabase/migrations/`. These are **schema-only** migrations that create the database structure without any test data.
 
 1. Go to your Supabase Dashboard > SQL Editor
 2. Run each migration file in chronological order (files are timestamped)
@@ -57,6 +57,26 @@ The migrations will create:
 - Row Level Security (RLS) policies
 - Database functions and triggers
 - Storage buckets for documents
+
+#### Seed Data (Optional)
+
+For development/testing, you can optionally run the seed file to populate sample data:
+
+```bash
+# Using Make (recommended)
+make seed
+
+# Or manually via Supabase SQL Editor
+# Copy contents of supabase/seed.sql and run in SQL Editor
+```
+
+The seed file (`supabase/seed.sql`) includes:
+- Sample departments (Engineering, HR, Finance, etc.)
+- Leave types (Annual, Sick, Casual, etc.)
+- Company holidays (adjust dates as needed)
+- Sample assets for testing
+
+**Note:** Do NOT run seed data on production databases. It's meant for development only.
 
 #### Enable Required Extensions
 
