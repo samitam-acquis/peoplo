@@ -757,7 +757,7 @@ const Attendance = () => {
               <Skeleton className="h-64 w-full" />
             ) : attendanceRecords && attendanceRecords.length > 0 ? (
             <>
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -780,6 +780,7 @@ const Attendance = () => {
                         Total Hours
                       </SortableTableHead>
                       <TableHead>Overtime</TableHead>
+                      <TableHead>Location</TableHead>
                       <SortableTableHead
                         sortKey="status"
                         currentSortKey={historySorting.sortConfig.key as string | null}
@@ -801,7 +802,7 @@ const Attendance = () => {
                             <div className="flex items-center gap-2">
                               {record.clock_in ? format(new Date(record.clock_in), "hh:mm a") : "-"}
                               {lateMinutes > 0 && (
-                                <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-xs">
+                                <Badge variant="destructive" className="text-xs">
                                   <AlertTriangle className="h-3 w-3 mr-1" />
                                   {formatLateDuration(lateMinutes)} late
                                 </Badge>
@@ -816,11 +817,35 @@ const Attendance = () => {
                           </TableCell>
                           <TableCell>
                             {overtime > 0 ? (
-                              <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">
+                              <Badge variant="secondary" className="text-xs">
                                 +{overtime.toFixed(2)} hrs
                               </Badge>
                             ) : (
                               <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {(record.clock_in_location_name || record.clock_out_location_name) ? (
+                              <div className="flex flex-col gap-1 max-w-[200px]">
+                                {record.clock_in_location_name && (
+                                  <div className="flex items-start gap-1.5 text-xs">
+                                    <MapPin className="h-3 w-3 text-primary shrink-0 mt-0.5" />
+                                    <span className="text-muted-foreground truncate" title={record.clock_in_location_name}>
+                                      In: {record.clock_in_location_name}
+                                    </span>
+                                  </div>
+                                )}
+                                {record.clock_out_location_name && (
+                                  <div className="flex items-start gap-1.5 text-xs">
+                                    <MapPin className="h-3 w-3 text-primary shrink-0 mt-0.5" />
+                                    <span className="text-muted-foreground truncate" title={record.clock_out_location_name}>
+                                      Out: {record.clock_out_location_name}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
                             )}
                           </TableCell>
                           <TableCell>{getStatusBadge(record.status)}</TableCell>
