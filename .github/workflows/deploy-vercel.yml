@@ -2,7 +2,9 @@ name: Deploy to Vercel
 
 on:
   push:
-    branches: [main]
+    branches: [VERCEL]
+  pull_request:
+    branches: [VERCEL]
   workflow_dispatch:
 
 env:
@@ -22,6 +24,11 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Update APP_VERSION from git tag
+        run: |
+          chmod +x scripts/update-version.sh
+          ./scripts/update-version.sh
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
