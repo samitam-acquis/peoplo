@@ -67,6 +67,18 @@ export function useDashboardStats() {
 
         const amOnLeave = (myLeaves?.length || 0) > 0;
 
+        // Get my leave balances for current year
+        const currentYear = new Date().getFullYear();
+        const { data: leaveBalances } = await supabase
+          .from("leave_balances")
+          .select("total_days, used_days")
+          .eq("employee_id", myEmployee.id)
+          .eq("year", currentYear);
+
+        const totalLeaves = leaveBalances?.reduce((sum, lb) => sum + (lb.total_days || 0), 0) || 0;
+        const usedLeaves = leaveBalances?.reduce((sum, lb) => sum + (lb.used_days || 0), 0) || 0;
+        const availableLeaves = totalLeaves - usedLeaves;
+
         // Get my assigned assets
         const { data: myAssets } = await supabase
           .from("asset_assignments")
@@ -96,11 +108,14 @@ export function useDashboardStats() {
 
         return {
           totalEmployees: null,
-          onLeaveToday: amOnLeave ? 1 : 0, // Show if I'm on leave
+          onLeaveToday: amOnLeave ? 1 : 0,
           assetsAssigned: myAssetsCount,
           pendingPayroll: null,
           pendingApprovals,
           isEmployee: true,
+          totalLeaves,
+          usedLeaves,
+          availableLeaves,
         };
       }
 
