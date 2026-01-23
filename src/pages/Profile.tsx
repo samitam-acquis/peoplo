@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, User, Mail, Phone, MapPin, Building2, Calendar, Briefcase, Save, Shield, FileText, Clock, Wallet, Files } from "lucide-react";
+import { Loader2, User, Mail, Phone, MapPin, Building2, Calendar, Briefcase, Save, Shield, FileText, Clock, Wallet, Files, Package, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -28,6 +28,9 @@ import { LeaveRequestForm } from "@/components/profile/LeaveRequestForm";
 import { LeaveRequestHistory } from "@/components/profile/LeaveRequestHistory";
 import { PayslipViewer } from "@/components/profile/PayslipViewer";
 import { TaxDocumentsViewer } from "@/components/profile/TaxDocumentsViewer";
+import { MyAttendanceHistory } from "@/components/profile/MyAttendanceHistory";
+import { MyAssets } from "@/components/profile/MyAssets";
+import { MyPerformanceReviews } from "@/components/profile/MyPerformanceReviews";
 
 interface EmployeeProfile {
   id: string;
@@ -69,7 +72,7 @@ const Profile = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const tabParam = (searchParams.get("tab") || "").toLowerCase();
-  const allowedTabs = ["profile", "leaves", "payslips", "documents"] as const;
+  const allowedTabs = ["profile", "leaves", "attendance", "assets", "reviews", "payslips", "documents"] as const;
   const initialTab = allowedTabs.includes(tabParam as (typeof allowedTabs)[number]) ? tabParam : "profile";
 
   const [activeTab, setActiveTab] = useState<string>(initialTab);
@@ -266,7 +269,7 @@ const Profile = () => {
           </Card>
         ) : (
           <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+            <TabsList className="flex flex-wrap h-auto gap-1 w-full lg:w-auto lg:inline-flex">
               <TabsTrigger value="profile" className="gap-2">
                 <User className="h-4 w-4" />
                 <span className="hidden sm:inline">Profile</span>
@@ -274,6 +277,18 @@ const Profile = () => {
               <TabsTrigger value="leaves" className="gap-2">
                 <Calendar className="h-4 w-4" />
                 <span className="hidden sm:inline">Leaves</span>
+              </TabsTrigger>
+              <TabsTrigger value="attendance" className="gap-2">
+                <Clock className="h-4 w-4" />
+                <span className="hidden sm:inline">Attendance</span>
+              </TabsTrigger>
+              <TabsTrigger value="assets" className="gap-2">
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">Assets</span>
+              </TabsTrigger>
+              <TabsTrigger value="reviews" className="gap-2">
+                <Star className="h-4 w-4" />
+                <span className="hidden sm:inline">Reviews</span>
               </TabsTrigger>
               <TabsTrigger value="payslips" className="gap-2">
                 <Wallet className="h-4 w-4" />
@@ -548,6 +563,21 @@ const Profile = () => {
                   <LeaveRequestForm employeeId={employee.id} />
                 </div>
               </div>
+            </TabsContent>
+
+            {/* Attendance Tab */}
+            <TabsContent value="attendance" className="space-y-6">
+              <MyAttendanceHistory employeeId={employee.id} />
+            </TabsContent>
+
+            {/* Assets Tab */}
+            <TabsContent value="assets" className="space-y-6">
+              <MyAssets employeeId={employee.id} />
+            </TabsContent>
+
+            {/* Reviews Tab */}
+            <TabsContent value="reviews" className="space-y-6">
+              <MyPerformanceReviews employeeId={employee.id} />
             </TabsContent>
 
             {/* Payslips Tab */}
