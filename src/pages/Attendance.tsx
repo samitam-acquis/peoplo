@@ -7,6 +7,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Clock, LogIn, LogOut, Calendar, Briefcase, Timer, AlertTriangle, MapPin, Loader2, Home, Building2 } from "lucide-react";
 import { usePagination } from "@/hooks/usePagination";
 import { useSorting } from "@/hooks/useSorting";
@@ -60,6 +70,8 @@ const Attendance = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [workMode, setWorkMode] = useState<WorkMode>('wfo');
+  const [showEarlyClockOutWarning, setShowEarlyClockOutWarning] = useState(false);
+  const [earlyClockOutReasons, setEarlyClockOutReasons] = useState<{ beforeEndTime: boolean; insufficientHours: boolean }>({ beforeEndTime: false, insufficientHours: false });
 
   const targetDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), 1);
 
@@ -271,11 +283,50 @@ const Attendance = () => {
     }
   };
 
+  // Calculate current hours worked for early clock-out warning
+  const calculateCurrentHoursWorked = (): number => {
+    if (!todayRecord?.clock_in) return 0;
+    const clockInTime = new Date(todayRecord.clock_in);
+    const now = new Date();
+    return (now.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
+  };
+
+  // Check if current time is before scheduled end time
+  const isBeforeEndTime = (): boolean => {
+    if (!currentEmployee?.working_hours_end) return false;
+    const [endHour, endMin] = currentEmployee.working_hours_end.split(':').map(Number);
+    const now = new Date();
+    const endTimeToday = new Date();
+    endTimeToday.setHours(endHour, endMin, 0, 0);
+    return now < endTimeToday;
+  };
+
+  const handleClockOutAttempt = () => {
+    if (!todayRecord || !todayRecord.clock_in) {
+      toast.error("No active clock-in found");
+      return;
+    }
+
+    const hoursWorked = calculateCurrentHoursWorked();
+    const requiredHours = 9;
+    const beforeEndTime = isBeforeEndTime();
+    const insufficientHours = hoursWorked < requiredHours;
+
+    if (beforeEndTime || insufficientHours) {
+      setEarlyClockOutReasons({ beforeEndTime, insufficientHours });
+      setShowEarlyClockOutWarning(true);
+    } else {
+      handleClockOut();
+    }
+  };
+
   const handleClockOut = async () => {
     if (!todayRecord || !todayRecord.clock_in) {
       toast.error("No active clock-in found");
       return;
     }
+
+    setShowEarlyClockOutWarning(false);
 
     try {
       toast.info("Getting your location...");
@@ -285,6 +336,13 @@ const Attendance = () => {
     } catch (error) {
       toast.error("Failed to clock out");
     }
+  };
+
+  // Format hours for display in warning
+  const formatHoursWorked = (hours: number): string => {
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
   };
 
   const exportToCSV = (startDate?: Date, endDate?: Date) => {
@@ -493,7 +551,7 @@ const Attendance = () => {
                             )}
                           </Badge>
                         )}
-                        <Button onClick={handleClockOut} variant="outline" disabled={clockOut.isPending}>
+                        <Button onClick={handleClockOutAttempt} variant="outline" disabled={clockOut.isPending}>
                           {clockOut.isPending ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           ) : (
@@ -1022,6 +1080,40 @@ const Attendance = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Early Clock-Out Warning Dialog */}
+      <AlertDialog open={showEarlyClockOutWarning} onOpenChange={setShowEarlyClockOutWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Early Clock-Out Warning
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {earlyClockOutReasons.insufficientHours && (
+                  <p>
+                    You have only worked <span className="font-semibold">{formatHoursWorked(calculateCurrentHoursWorked())}</span> today. 
+                    The required minimum is <span className="font-semibold">9 hours</span>.
+                  </p>
+                )}
+                {earlyClockOutReasons.beforeEndTime && currentEmployee?.working_hours_end && (
+                  <p>
+                    Your scheduled end time is <span className="font-semibold">{formatTimeDisplay(currentEmployee.working_hours_end)}</span>.
+                  </p>
+                )}
+                <p className="pt-2">Are you sure you want to clock out early?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continue Working</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClockOut}>
+              Clock Out Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
