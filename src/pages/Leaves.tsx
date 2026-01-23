@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { LeaveRequestCard, LeaveRequest } from "@/components/leaves/LeaveRequestCard";
 import { LeaveRequestForm } from "@/components/profile/LeaveRequestForm";
+import { LeaveCalendarView } from "@/components/leaves/LeaveCalendarView";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -564,28 +565,7 @@ const Leaves = () => {
           </TabsContent>
 
           <TabsContent value="calendar" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Leave Calendar</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-7 gap-2 text-center">
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => <div key={day} className="p-2 text-sm font-medium text-muted-foreground">
-                      {day}
-                    </div>)}
-                  {Array.from({
-                  length: 35
-                }, (_, i) => {
-                  const day = i - 0;
-                  const isCurrentMonth = day >= 1 && day <= 31;
-                  const isToday = day === new Date().getDate();
-                  return <div key={i} className={`relative rounded-lg p-2 text-sm ${isCurrentMonth ? "text-foreground hover:bg-muted" : "text-muted-foreground/50"} ${isToday ? "ring-2 ring-primary" : ""}`}>
-                        {isCurrentMonth ? day : ""}
-                      </div>;
-                })}
-                </div>
-              </CardContent>
-            </Card>
+            <LeaveCalendarView />
           </TabsContent>
         </Tabs>
 
