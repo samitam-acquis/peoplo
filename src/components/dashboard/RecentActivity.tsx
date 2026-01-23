@@ -49,9 +49,7 @@ async function fetchActivityLogs(): Promise<ActivityItem[]> {
       ? log.details as Record<string, unknown>
       : null;
 
-    const userName = (details?.performed_by as string) || 
-                     (details?.employee_name as string) || 
-                     "System";
+    const employeeName = (details?.employee_name as string) || "Someone";
     
     let status: ActivityItem["status"] = "completed";
     const action = log.action.toLowerCase();
@@ -60,16 +58,40 @@ async function fetchActivityLogs(): Promise<ActivityItem[]> {
     else if (action.includes("pending") || action === "pending") status = "pending";
     else if (action.includes("created") || action === "created") status = "created";
 
-    const entityName = details?.name || 
-                       details?.leave_type || 
+    const entityName = details?.leave_type || 
                        details?.asset_name ||
+                       details?.name ||
                        log.entity_type.replace(/_/g, " ");
+
+    // Format action text based on entity type and action
+    let formattedAction = action.replace(/_/g, " ");
+    let userName = employeeName;
+    let type = String(entityName);
+    
+    if (log.entity_type === "leave_request") {
+      if (status === "approved") {
+        formattedAction = "'s leave request was approved";
+        type = `(${entityName})`;
+      } else if (status === "rejected") {
+        formattedAction = "'s leave request was rejected";
+        type = `(${entityName})`;
+      } else if (status === "pending" || action === "created") {
+        formattedAction = "requested";
+        type = `${entityName} leave`;
+      }
+    } else if (log.entity_type === "attendance") {
+      formattedAction = action.includes("out") ? "clocked out" : "clocked in";
+      type = "";
+    } else if (log.entity_type === "asset_assignment") {
+      formattedAction = action.includes("return") ? "returned" : "was assigned";
+      type = String(details?.asset_name || "an asset");
+    }
 
     return {
       id: log.id,
       userName,
-      action: log.action.replace(/_/g, " "),
-      type: String(entityName),
+      action: formattedAction,
+      type,
       status,
       createdAt: log.created_at,
     };
@@ -101,15 +123,21 @@ async function fetchRecentEvents(): Promise<ActivityItem[]> {
     
     let action = "requested";
     let status: ActivityItem["status"] = "pending";
-    if (leave.status === "approved") { action = "approved"; status = "approved"; }
-    else if (leave.status === "rejected") { action = "rejected"; status = "rejected"; }
+    
+    if (leave.status === "approved") {
+      action = "'s leave request was approved";
+      status = "approved";
+    } else if (leave.status === "rejected") {
+      action = "'s leave request was rejected";
+      status = "rejected";
+    }
 
     activities.push({
       id: `leave-${leave.id}`,
       userName,
       avatarUrl: emp?.avatar_url || undefined,
       action,
-      type: `${leaveType?.name || "Leave"} request`,
+      type: leave.status === "pending" ? `${leaveType?.name || "Leave"} request` : `(${leaveType?.name || "Leave"})`,
       status,
       createdAt: leave.updated_at,
     });
