@@ -120,12 +120,12 @@ const Attendance = () => {
     return (days || [1, 2, 3, 4, 5]).includes(today);
   };
 
-  // Calculate overtime for a record based on configured working hours
-  const calculateOvertime = (record: { clock_in: string | null; clock_out: string | null; total_hours: number | null }): number => {
-    if (!currentEmployee || !record.clock_out || !record.total_hours) return 0;
+  // Calculate overtime for a record based on the record's employee schedule
+  const calculateOvertime = (record: { clock_in: string | null; clock_out: string | null; total_hours: number | null; employee?: { working_hours_start: string | null; working_hours_end: string | null } }): number => {
+    if (!record.clock_out || !record.total_hours) return 0;
     
-    const workEnd = currentEmployee.working_hours_end || "18:00:00";
-    const workStart = currentEmployee.working_hours_start || "09:00:00";
+    const workStart = record.employee?.working_hours_start || currentEmployee?.working_hours_start || "09:00:00";
+    const workEnd = record.employee?.working_hours_end || currentEmployee?.working_hours_end || "18:00:00";
     
     // Calculate expected hours accounting for cross-midnight shifts
     const expectedHours = getExpectedHours(workStart, workEnd);
@@ -141,11 +141,11 @@ const Attendance = () => {
     return attendanceRecords.reduce((total, record) => total + calculateOvertime(record), 0);
   };
 
-  // Calculate late arrival in minutes
-  const calculateLateArrival = (clockIn: string | null): number => {
-    if (!currentEmployee || !clockIn) return 0;
+  // Calculate late arrival in minutes using the record's employee schedule
+  const calculateLateArrival = (clockIn: string | null, employeeSchedule?: { working_hours_start: string | null; working_hours_end: string | null }): number => {
+    if (!clockIn) return 0;
     
-    const workStart = currentEmployee.working_hours_start || "09:00:00";
+    const workStart = employeeSchedule?.working_hours_start || currentEmployee?.working_hours_start || "09:00:00";
     const [startHour, startMin] = workStart.split(':').map(Number);
     
     const clockInDate = new Date(clockIn);
@@ -171,7 +171,7 @@ const Attendance = () => {
   // Count late arrivals for the month
   const countLateArrivals = (): number => {
     if (!attendanceRecords) return 0;
-    return attendanceRecords.filter(record => calculateLateArrival(record.clock_in) > 0).length;
+    return attendanceRecords.filter(record => calculateLateArrival(record.clock_in, record.employee) > 0).length;
   };
 
   // Sorting for report data
@@ -899,7 +899,7 @@ const Attendance = () => {
                   <TableBody>
                     {historyPagination.paginatedItems.map((record) => {
                       const overtime = calculateOvertime(record);
-                      const lateMinutes = calculateLateArrival(record.clock_in);
+                      const lateMinutes = calculateLateArrival(record.clock_in, record.employee);
                       return (
                         <TableRow key={record.id}>
                           <TableCell>{format(new Date(record.date), "MMM d, yyyy")}</TableCell>

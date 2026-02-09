@@ -22,6 +22,8 @@ export interface AttendanceRecord {
     first_name: string;
     last_name: string;
     employee_code: string;
+    working_hours_start: string | null;
+    working_hours_end: string | null;
   };
 }
 
@@ -45,7 +47,7 @@ export function useAttendance(month?: Date) {
         .from("attendance_records")
         .select(`
           *,
-          employee:employees(first_name, last_name, employee_code)
+          employee:employees(first_name, last_name, employee_code, working_hours_start, working_hours_end)
         `)
         .gte("date", start)
         .lte("date", end)
