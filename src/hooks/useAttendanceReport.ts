@@ -99,8 +99,11 @@ export function useAttendanceReportData(month: number, year: number) {
 
           if (clockInTime > scheduledStart) {
             const lateMinutes = differenceInMinutes(clockInTime, scheduledStart);
-            empData.lateArrivals++;
-            empData.totalLateMinutes += lateMinutes;
+            // 1-minute grace period to account for seconds precision
+            if (lateMinutes > 1) {
+              empData.lateArrivals++;
+              empData.totalLateMinutes += lateMinutes;
+            }
           }
         }
 

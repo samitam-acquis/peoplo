@@ -153,12 +153,12 @@ const Attendance = () => {
     const clockInHour = clockInDate.getHours();
     const clockInMinute = clockInDate.getMinutes();
     
-    // Calculate minutes late
+    // Calculate minutes late (1-minute grace period to account for seconds)
     const scheduledMinutes = startHour * 60 + startMin;
     const actualMinutes = clockInHour * 60 + clockInMinute;
     const lateMinutes = actualMinutes - scheduledMinutes;
     
-    return lateMinutes > 0 ? lateMinutes : 0;
+    return lateMinutes > 1 ? lateMinutes : 0;
   };
 
   // Format late duration for display
