@@ -243,16 +243,16 @@ const Attendance = () => {
           console.error("Geolocation error:", error);
           switch (error.code) {
             case error.PERMISSION_DENIED:
-              toast.error("Location permission denied. Please enable location access.");
+              toast.error("Location access is required to clock in. Please enable location permissions in your browser settings and try again.");
               break;
             case error.POSITION_UNAVAILABLE:
-              toast.error("Location information is unavailable.");
+              toast.error("Location information is unavailable. Clock-in requires location access.");
               break;
             case error.TIMEOUT:
-              toast.error("Location request timed out.");
+              toast.error("Location request timed out. Please try again.");
               break;
             default:
-              toast.error("Failed to get location.");
+              toast.error("Failed to get location. Clock-in requires location access.");
           }
           resolve(undefined);
         },
@@ -274,9 +274,15 @@ const Attendance = () => {
     try {
       toast.info("Getting your location...");
       const location = await getCurrentLocation();
+      
+      if (!location) {
+        // Location is mandatory — block clock-in
+        return;
+      }
+      
       await clockIn.mutateAsync({ employeeId: currentEmployee.id, location, workMode: mode });
       const modeLabel = mode === 'wfh' ? 'Work From Home' : 'Work From Office';
-      toast.success(`Clocked in (${modeLabel})${location ? ' with location' : ''}`);
+      toast.success(`Clocked in (${modeLabel}) with location`);
     } catch (error) {
       toast.error("Failed to clock in");
     }
