@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/pagination";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { useAttendance, useTodayAttendance, useClockIn, useClockOut, useAttendanceReport, LocationData, WorkMode } from "@/hooks/useAttendance";
+import { getExpectedHours, getShiftEndTime } from "@/lib/shiftUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -126,10 +127,8 @@ const Attendance = () => {
     const workEnd = currentEmployee.working_hours_end || "18:00:00";
     const workStart = currentEmployee.working_hours_start || "09:00:00";
     
-    // Calculate expected hours from schedule
-    const [startHour, startMin] = workStart.split(':').map(Number);
-    const [endHour, endMin] = workEnd.split(':').map(Number);
-    const expectedHours = (endHour + endMin / 60) - (startHour + startMin / 60);
+    // Calculate expected hours accounting for cross-midnight shifts
+    const expectedHours = getExpectedHours(workStart, workEnd);
     
     // Overtime is hours worked beyond expected hours
     const overtime = record.total_hours - expectedHours;
@@ -291,14 +290,12 @@ const Attendance = () => {
     return (now.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
   };
 
-  // Check if current time is before scheduled end time
+  // Check if current time is before scheduled end time (handles cross-midnight shifts)
   const isBeforeEndTime = (): boolean => {
-    if (!currentEmployee?.working_hours_end) return false;
-    const [endHour, endMin] = currentEmployee.working_hours_end.split(':').map(Number);
-    const now = new Date();
-    const endTimeToday = new Date();
-    endTimeToday.setHours(endHour, endMin, 0, 0);
-    return now < endTimeToday;
+    if (!currentEmployee?.working_hours_end || !currentEmployee?.working_hours_start || !todayRecord?.clock_in) return false;
+    const clockInTime = new Date(todayRecord.clock_in);
+    const endTime = getShiftEndTime(clockInTime, currentEmployee.working_hours_start, currentEmployee.working_hours_end);
+    return new Date() < endTime;
   };
 
   const handleClockOutAttempt = () => {
@@ -308,7 +305,9 @@ const Attendance = () => {
     }
 
     const hoursWorked = calculateCurrentHoursWorked();
-    const requiredHours = 9;
+    const workStart = currentEmployee?.working_hours_start || "09:00:00";
+    const workEnd = currentEmployee?.working_hours_end || "18:00:00";
+    const requiredHours = getExpectedHours(workStart, workEnd);
     const beforeEndTime = isBeforeEndTime();
     const insufficientHours = hoursWorked < requiredHours;
 
