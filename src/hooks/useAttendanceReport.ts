@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, parseISO, differenceInMinutes } from "date-fns";
+import { getExpectedHours } from "@/lib/shiftUtils";
 
 interface AttendanceReportRecord {
   employeeId: string;
@@ -99,16 +100,17 @@ export function useAttendanceReportData(month: number, year: number) {
 
           if (clockInTime > scheduledStart) {
             const lateMinutes = differenceInMinutes(clockInTime, scheduledStart);
-            empData.lateArrivals++;
-            empData.totalLateMinutes += lateMinutes;
+            // 1-minute grace period to account for seconds precision
+            if (lateMinutes > 1) {
+              empData.lateArrivals++;
+              empData.totalLateMinutes += lateMinutes;
+            }
           }
         }
 
-        // Calculate overtime
+        // Calculate overtime (handles cross-midnight shifts)
         if (record.total_hours && emp.working_hours_start && emp.working_hours_end) {
-          const [startHour, startMinute] = emp.working_hours_start.split(":").map(Number);
-          const [endHour, endMinute] = emp.working_hours_end.split(":").map(Number);
-          const expectedHours = (endHour * 60 + endMinute - startHour * 60 - startMinute) / 60;
+          const expectedHours = getExpectedHours(emp.working_hours_start, emp.working_hours_end);
           
           if (record.total_hours > expectedHours) {
             empData.totalOvertimeHours += record.total_hours - expectedHours;

@@ -48,8 +48,14 @@ export function useSubmitLeaveRequest() {
       const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
       const daysCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-      const startDateStr = startDate.toISOString().split("T")[0];
-      const endDateStr = endDate.toISOString().split("T")[0];
+      const formatLocalDate = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      };
+      const startDateStr = formatLocalDate(startDate);
+      const endDateStr = formatLocalDate(endDate);
 
       const { data, error } = await supabase
         .from("leave_requests")
