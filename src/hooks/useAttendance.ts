@@ -59,21 +59,35 @@ export function useAttendance(month?: Date) {
 
 export function useTodayAttendance(employeeId?: string) {
   const today = format(new Date(), "yyyy-MM-dd");
+  const yesterday = format(new Date(Date.now() - 86400000), "yyyy-MM-dd");
 
   return useQuery({
     queryKey: ["attendance-today", today, employeeId],
     queryFn: async () => {
       if (!employeeId) return null;
       
-      const { data, error } = await supabase
+      // First check today's record
+      const { data: todayData, error: todayError } = await supabase
         .from("attendance_records")
         .select("*")
         .eq("date", today)
         .eq("employee_id", employeeId)
         .maybeSingle();
 
-      if (error) throw error;
-      return data as unknown as AttendanceRecord | null;
+      if (todayError) throw todayError;
+      if (todayData) return todayData as unknown as AttendanceRecord | null;
+
+      // If no today record, check for yesterday's unclosed record (cross-midnight shifts)
+      const { data: yesterdayData, error: yesterdayError } = await supabase
+        .from("attendance_records")
+        .select("*")
+        .eq("date", yesterday)
+        .eq("employee_id", employeeId)
+        .is("clock_out", null)
+        .maybeSingle();
+
+      if (yesterdayError) throw yesterdayError;
+      return yesterdayData as unknown as AttendanceRecord | null;
     },
     enabled: !!employeeId,
   });
