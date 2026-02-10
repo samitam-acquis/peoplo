@@ -13,23 +13,25 @@ const ResetPassword = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [isValidSession, setIsValidSession] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Listen for the PASSWORD_RECOVERY event from the email link
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
         setIsValidSession(true);
+        setChecking(false);
       }
     });
 
-    // Also check if user already has a valid session (e.g. page refresh)
+    // Check if there's already a valid session (recovery token already processed)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setIsValidSession(true);
       }
+      setChecking(false);
     });
 
     return () => subscription.unsubscribe();
@@ -58,6 +60,14 @@ const ResetPassword = () => {
       navigate("/dashboard", { replace: true });
     }
   };
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!isValidSession) {
     return (
