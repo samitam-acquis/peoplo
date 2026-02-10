@@ -453,6 +453,7 @@ const Profile = () => {
                           value={formData.date_of_birth}
                           onChange={(e) => setFormData(prev => ({ ...prev, date_of_birth: e.target.value }))}
                           disabled={!isEditing}
+                          max={new Date(new Date().getFullYear() - 18, new Date().getMonth(), new Date().getDate()).toISOString().split('T')[0]}
                         />
                       </div>
                       <div className="space-y-2">

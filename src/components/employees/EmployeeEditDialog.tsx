@@ -519,6 +519,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                       type="date"
                       value={formData.date_of_birth}
                       onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                      max={new Date(new Date().getFullYear() - 18, new Date().getMonth(), new Date().getDate()).toISOString().split('T')[0]}
                     />
                   </div>
                   <div className="space-y-2">
