@@ -115,6 +115,27 @@ const Auth = () => {
 
     setIsLoading(true);
 
+    // Check if email already exists in profiles
+    try {
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', signupEmail.trim().toLowerCase())
+        .maybeSingle();
+
+      if (existingProfile) {
+        setIsLoading(false);
+        toast({
+          title: "Account Exists",
+          description: "An account with this email already exists. Please log in instead.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking existing profile:", error);
+    }
+
     // Check domain whitelist before signup
     try {
       const { data: settings } = await supabase
