@@ -32,6 +32,8 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
@@ -88,6 +90,25 @@ const Auth = () => {
           variant: "destructive",
         });
       }
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      toast({ title: "Error", description: "Please enter your email address.", variant: "destructive" });
+      return;
+    }
+    setIsLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setIsLoading(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Email Sent", description: "Check your email for the password reset link." });
+      setShowForgotPassword(false);
     }
   };
 
@@ -261,6 +282,11 @@ const Auth = () => {
                       <p className="text-sm text-destructive">{errors.login_password}</p>
                     )}
                   </div>
+                  <div className="flex justify-end">
+                    <Button type="button" variant="link" className="h-auto p-0 text-sm" onClick={() => { setShowForgotPassword(true); setResetEmail(loginEmail); }}>
+                      Forgot password?
+                    </Button>
+                  </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? (
                       <>
@@ -272,6 +298,21 @@ const Auth = () => {
                     )}
                   </Button>
                 </form>
+
+                {showForgotPassword && (
+                  <div className="mt-6 border-t pt-6">
+                    <h3 className="mb-2 text-sm font-medium">Reset Password</h3>
+                    <form onSubmit={handleForgotPassword} className="space-y-3">
+                      <Input type="email" placeholder="Enter your email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} disabled={isLoading} />
+                      <div className="flex gap-2">
+                        <Button type="submit" className="flex-1" disabled={isLoading}>
+                          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Reset Link"}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setShowForgotPassword(false)}>Cancel</Button>
+                      </div>
+                    </form>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="signup" className="mt-6">
@@ -353,3 +394,4 @@ const Auth = () => {
 };
 
 export default Auth;
+
