@@ -137,6 +137,56 @@ export type Database = {
         }
         Relationships: []
       }
+      attendance_breaks: {
+        Row: {
+          attendance_record_id: string
+          created_at: string
+          id: string
+          pause_latitude: number | null
+          pause_location_name: string | null
+          pause_longitude: number | null
+          pause_time: string
+          resume_latitude: number | null
+          resume_location_name: string | null
+          resume_longitude: number | null
+          resume_time: string | null
+        }
+        Insert: {
+          attendance_record_id: string
+          created_at?: string
+          id?: string
+          pause_latitude?: number | null
+          pause_location_name?: string | null
+          pause_longitude?: number | null
+          pause_time?: string
+          resume_latitude?: number | null
+          resume_location_name?: string | null
+          resume_longitude?: number | null
+          resume_time?: string | null
+        }
+        Update: {
+          attendance_record_id?: string
+          created_at?: string
+          id?: string
+          pause_latitude?: number | null
+          pause_location_name?: string | null
+          pause_longitude?: number | null
+          pause_time?: string
+          resume_latitude?: number | null
+          resume_location_name?: string | null
+          resume_longitude?: number | null
+          resume_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_breaks_attendance_record_id_fkey"
+            columns: ["attendance_record_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance_records: {
         Row: {
           clock_in: string | null
