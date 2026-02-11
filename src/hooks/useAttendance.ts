@@ -135,7 +135,39 @@ export function useClockOut() {
     mutationFn: async ({ recordId, clockIn, location, customClockOut }: { recordId: string; clockIn: string; location?: LocationData; customClockOut?: Date }) => {
       const clockOutTime = customClockOut || new Date();
       const clockInTime = new Date(clockIn);
-      const totalHours = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
+      const grossHours = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
+
+      // Auto-resume any open break before clocking out
+      const { data: openBreak } = await supabase
+        .from("attendance_breaks" as any)
+        .select("id")
+        .eq("attendance_record_id", recordId)
+        .is("resume_time", null)
+        .maybeSingle();
+
+      if (openBreak) {
+        await supabase
+          .from("attendance_breaks" as any)
+          .update({ resume_time: clockOutTime.toISOString() } as any)
+          .eq("id", (openBreak as any).id);
+      }
+
+      // Calculate total break duration
+      const { data: breaks } = await supabase
+        .from("attendance_breaks" as any)
+        .select("pause_time, resume_time")
+        .eq("attendance_record_id", recordId);
+
+      let breakHours = 0;
+      if (breaks) {
+        breakHours = (breaks as any[]).reduce((total: number, b: any) => {
+          const resumeMs = b.resume_time ? new Date(b.resume_time).getTime() : clockOutTime.getTime();
+          const pauseMs = new Date(b.pause_time).getTime();
+          return total + (resumeMs - pauseMs) / (1000 * 60 * 60);
+        }, 0);
+      }
+
+      const totalHours = Math.max(0, grossHours - breakHours);
 
       const { data, error } = await supabase
         .from("attendance_records")
@@ -156,6 +188,8 @@ export function useClockOut() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
+      queryClient.invalidateQueries({ queryKey: ["active-break"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-breaks"] });
     },
   });
 }
