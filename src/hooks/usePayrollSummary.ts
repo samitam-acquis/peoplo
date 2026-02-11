@@ -47,7 +47,7 @@ export function usePayrollSummary(month: number, year: number) {
             employee_code,
             first_name,
             last_name,
-            department:departments(name)
+            department:departments!employees_department_id_fkey(name)
           )
         `)
         .eq("month", month)
