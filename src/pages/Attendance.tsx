@@ -37,10 +37,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import { DateRangeExportDialog } from "@/components/export/DateRangeExportDialog";
-import { useDepartments } from "@/hooks/useDepartments";
 
 const MONTHS = [
   { value: "0", label: "January" },
@@ -74,7 +70,7 @@ const Attendance = () => {
   const [workMode, setWorkMode] = useState<WorkMode>('wfo');
   const [showEarlyClockOutWarning, setShowEarlyClockOutWarning] = useState(false);
   const [earlyClockOutReasons, setEarlyClockOutReasons] = useState<{ beforeEndTime: boolean; insufficientHours: boolean }>({ beforeEndTime: false, insufficientHours: false });
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
+  
 
   const targetDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), 1);
 
@@ -98,13 +94,7 @@ const Attendance = () => {
   const { data: todayRecord, isLoading: todayLoading } = useTodayAttendance(currentEmployee?.id);
   const { data: attendanceRecords, isLoading: recordsLoading } = useAttendance(targetDate);
   const { data: reportData, isLoading: reportLoading } = useAttendanceReport(targetDate);
-  const { data: departments } = useDepartments();
   const clockIn = useClockIn();
-
-  // Filter report data by department
-  const filteredReportData = reportData?.filter((emp) =>
-    selectedDepartment === "all" ? true : emp.department === selectedDepartment
-  );
   const clockOut = useClockOut();
   // Format time for display (e.g., "09:00:00" -> "9:00 AM")
   const formatTimeDisplay = (time: string | null): string => {
@@ -182,14 +172,8 @@ const Attendance = () => {
     return attendanceRecords.filter(record => calculateLateArrival(record.clock_in, record.employee) > 0).length;
   };
 
-  // Sorting for report data
-  const reportSorting = useSorting(filteredReportData || []);
-  
   // Sorting for attendance history
   const historySorting = useSorting(attendanceRecords || []);
-
-  // Pagination for report data (uses sorted items)
-  const reportPagination = usePagination(reportSorting.sortedItems, { initialPageSize: 10 });
   
   // Pagination for attendance history (uses sorted items)
   const historyPagination = usePagination(historySorting.sortedItems, { initialPageSize: 10 });
@@ -358,77 +342,6 @@ const Attendance = () => {
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
   };
 
-  const exportToCSV = (startDate?: Date, endDate?: Date) => {
-    if (!reportData || reportData.length === 0) return;
-
-    const monthName = MONTHS[parseInt(selectedMonth)].label;
-    const headers = ["Employee Code", "Name", "Department", "Present Days", "Total Hours", "Avg Hours/Day"];
-    const csvContent = [
-      headers.join(","),
-      ...reportData.map((emp) =>
-        [
-          `"${emp.employeeCode}"`,
-          `"${emp.employeeName}"`,
-          `"${emp.department}"`,
-          `"${emp.presentDays}"`,
-          `"${emp.totalHours.toFixed(2)}"`,
-          `"${emp.totalDays > 0 ? (emp.totalHours / emp.totalDays).toFixed(2) : "0"}"`,
-        ].join(",")
-      ),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    const dateRange = startDate || endDate 
-      ? `-${startDate ? format(startDate, "yyyy-MM-dd") : "start"}-to-${endDate ? format(endDate, "yyyy-MM-dd") : "end"}` 
-      : `-${monthName.toLowerCase()}-${selectedYear}`;
-    link.download = `attendance-report${dateRange}.csv`;
-    link.click();
-    toast.success(`${reportData.length} attendance records exported to CSV`);
-  };
-
-  const exportToPDF = (startDate?: Date, endDate?: Date) => {
-    if (!reportData || reportData.length === 0) return;
-
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const monthName = MONTHS[parseInt(selectedMonth)].label;
-
-    doc.setFontSize(20);
-    doc.text("Attendance Report", pageWidth / 2, 20, { align: "center" });
-
-    doc.setFontSize(12);
-    if (startDate || endDate) {
-      doc.text(`${startDate ? format(startDate, "PP") : "Start"} - ${endDate ? format(endDate, "PP") : "End"}`, pageWidth / 2, 28, { align: "center" });
-    } else {
-      doc.text(`${monthName} ${selectedYear}`, pageWidth / 2, 28, { align: "center" });
-    }
-
-    doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth / 2, 35, { align: "center" });
-
-    autoTable(doc, {
-      startY: 45,
-      head: [["Employee Code", "Name", "Department", "Present Days", "Total Hours", "Avg Hours/Day"]],
-      body: reportData.map((emp) => [
-        emp.employeeCode,
-        emp.employeeName,
-        emp.department,
-        emp.presentDays.toString(),
-        emp.totalHours.toFixed(2),
-        emp.totalDays > 0 ? (emp.totalHours / emp.totalDays).toFixed(2) : "0",
-      ]),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [59, 130, 246] },
-    });
-
-    const dateRange = startDate || endDate 
-      ? `-${startDate ? format(startDate, "yyyy-MM-dd") : "start"}-to-${endDate ? format(endDate, "yyyy-MM-dd") : "end"}` 
-      : `-${monthName.toLowerCase()}-${selectedYear}`;
-    doc.save(`attendance-report${dateRange}.pdf`);
-    toast.success(`${reportData.length} attendance records exported to PDF`);
-  };
 
   const currentTime = new Date();
   const isClockedIn = todayRecord?.clock_in && !todayRecord?.clock_out;
@@ -677,182 +590,54 @@ const Attendance = () => {
           </Card>
         )}
 
-        {/* Monthly Report */}
+        {/* My Monthly Summary */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader>
             <div className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle>Monthly Attendance Report</CardTitle>
+                <CardTitle>My Monthly Summary</CardTitle>
                 <CardDescription>
                   {MONTHS[parseInt(selectedMonth)].label} {selectedYear}
                 </CardDescription>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments?.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.name}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <DateRangeExportDialog
-                title="Export Attendance Report"
-                description={`Export attendance report for ${MONTHS[parseInt(selectedMonth)].label} ${selectedYear}. Use date filters for custom range or leave empty to export the selected month.`}
-                onExportCSV={exportToCSV}
-                onExportPDF={exportToPDF}
-                disabled={reportLoading || !filteredReportData?.length}
-              />
-            </div>
           </CardHeader>
           <CardContent>
             {reportLoading ? (
-              <Skeleton className="h-64 w-full" />
-            ) : filteredReportData && filteredReportData.length > 0 ? (
-              <>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <SortableTableHead
-                        sortKey="employeeCode"
-                        currentSortKey={reportSorting.sortConfig.key as string | null}
-                        direction={reportSorting.sortConfig.key === "employeeCode" ? reportSorting.sortConfig.direction : null}
-                        onSort={(key) => reportSorting.requestSort(key as keyof typeof reportSorting.sortedItems[0])}
-                      >
-                        Employee Code
-                      </SortableTableHead>
-                      <SortableTableHead
-                        sortKey="employeeName"
-                        currentSortKey={reportSorting.sortConfig.key as string | null}
-                        direction={reportSorting.sortConfig.key === "employeeName" ? reportSorting.sortConfig.direction : null}
-                        onSort={(key) => reportSorting.requestSort(key as keyof typeof reportSorting.sortedItems[0])}
-                      >
-                        Name
-                      </SortableTableHead>
-                      <SortableTableHead
-                        sortKey="department"
-                        currentSortKey={reportSorting.sortConfig.key as string | null}
-                        direction={reportSorting.sortConfig.key === "department" ? reportSorting.sortConfig.direction : null}
-                        onSort={(key) => reportSorting.requestSort(key as keyof typeof reportSorting.sortedItems[0])}
-                      >
-                        Department
-                      </SortableTableHead>
-                      <SortableTableHead
-                        sortKey="presentDays"
-                        currentSortKey={reportSorting.sortConfig.key as string | null}
-                        direction={reportSorting.sortConfig.key === "presentDays" ? reportSorting.sortConfig.direction : null}
-                        onSort={(key) => reportSorting.requestSort(key as keyof typeof reportSorting.sortedItems[0])}
-                      >
-                        Present Days
-                      </SortableTableHead>
-                      <SortableTableHead
-                        sortKey="totalHours"
-                        currentSortKey={reportSorting.sortConfig.key as string | null}
-                        direction={reportSorting.sortConfig.key === "totalHours" ? reportSorting.sortConfig.direction : null}
-                        onSort={(key) => reportSorting.requestSort(key as keyof typeof reportSorting.sortedItems[0])}
-                      >
-                        Total Hours
-                      </SortableTableHead>
-                      <TableHead>Avg Hours/Day</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reportPagination.paginatedItems.map((emp) => (
-                      <TableRow key={emp.employeeId}>
-                        <TableCell className="font-medium">{emp.employeeCode}</TableCell>
-                        <TableCell>{emp.employeeName}</TableCell>
-                        <TableCell>{emp.department}</TableCell>
-                        <TableCell>{emp.presentDays}</TableCell>
-                        <TableCell>{emp.totalHours.toFixed(2)} hrs</TableCell>
-                        <TableCell>
-                          {emp.totalDays > 0 ? (emp.totalHours / emp.totalDays).toFixed(2) : "0"} hrs
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              {/* Pagination for report */}
-              {reportPagination.totalPages > 1 && (
-                <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Show</span>
-                    <Select value={reportPagination.pageSize.toString()} onValueChange={(v) => reportPagination.setPageSize(Number(v))}>
-                      <SelectTrigger className="h-8 w-[70px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[5, 10, 20, 50].map((size) => (
-                          <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <span>of {reportPagination.totalItems} records</span>
+              <Skeleton className="h-24 w-full" />
+            ) : (() => {
+              const myData = reportData?.find((emp) => emp.employeeId === currentEmployee?.id);
+              if (!myData) {
+                return (
+                  <div className="flex h-24 items-center justify-center text-muted-foreground">
+                    No attendance records for this month
                   </div>
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          onClick={() => reportPagination.canGoPrevious && reportPagination.goToPreviousPage()}
-                          className={!reportPagination.canGoPrevious ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                      {(() => {
-                        const pages: (number | "ellipsis")[] = [];
-                        const { currentPage, totalPages } = reportPagination;
-                        if (totalPages <= 7) {
-                          for (let i = 1; i <= totalPages; i++) pages.push(i);
-                        } else {
-                          pages.push(1);
-                          if (currentPage > 3) pages.push("ellipsis");
-                          for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-                            pages.push(i);
-                          }
-                          if (currentPage < totalPages - 2) pages.push("ellipsis");
-                          pages.push(totalPages);
-                        }
-                        return pages.map((page, idx) =>
-                          page === "ellipsis" ? (
-                            <PaginationItem key={`ellipsis-${idx}`}>
-                              <PaginationEllipsis />
-                            </PaginationItem>
-                          ) : (
-                            <PaginationItem key={page}>
-                              <PaginationLink
-                                onClick={() => reportPagination.setPage(page)}
-                                isActive={reportPagination.currentPage === page}
-                                className="cursor-pointer"
-                              >
-                                {page}
-                              </PaginationLink>
-                            </PaginationItem>
-                          )
-                        );
-                      })()}
-                      <PaginationItem>
-                        <PaginationNext
-                          onClick={() => reportPagination.canGoNext && reportPagination.goToNextPage()}
-                          className={!reportPagination.canGoNext ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
+                );
+              }
+              return (
+                <div className="grid gap-4 sm:grid-cols-4">
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <p className="text-sm text-muted-foreground">Present Days</p>
+                    <p className="text-2xl font-bold">{myData.presentDays}</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <p className="text-sm text-muted-foreground">Total Hours</p>
+                    <p className="text-2xl font-bold">{myData.totalHours.toFixed(1)}h</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <p className="text-sm text-muted-foreground">Avg Hours/Day</p>
+                    <p className="text-2xl font-bold">
+                      {myData.totalDays > 0 ? (myData.totalHours / myData.totalDays).toFixed(1) : "0"}h
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <p className="text-sm text-muted-foreground">Late Arrivals</p>
+                    <p className="text-2xl font-bold">{myData.lateDays}</p>
+                  </div>
                 </div>
-              )}
-              </>
-            ) : (
-              <div className="flex h-32 items-center justify-center text-muted-foreground">
-                No attendance records for this period
-              </div>
-            )}
+              );
+            })()}
           </CardContent>
         </Card>
 
