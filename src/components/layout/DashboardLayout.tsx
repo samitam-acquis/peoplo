@@ -48,11 +48,13 @@ interface NavItem {
   icon: ReactNode;
   badge?: number;
   adminOnly?: boolean;
+  employeeOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: <Home className="h-5 w-5" /> },
   { label: "Employees", href: "/employees", icon: <Users className="h-5 w-5" />, adminOnly: true },
+  { label: "Team Directory", href: "/employees", icon: <Users className="h-5 w-5" />, employeeOnly: true },
   { label: "Departments", href: "/departments", icon: <Building2 className="h-5 w-5" />, adminOnly: true },
   { label: "Onboarding", href: "/onboarding", icon: <UserPlus className="h-5 w-5" />, adminOnly: true },
   { label: "Attendance", href: "/attendance", icon: <Clock className="h-5 w-5" /> },
@@ -77,7 +79,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { isAdminOrHR } = useIsAdminOrHR();
   const { data: versionData } = useVersionCheck();
 
-  const filteredNavItems = navItems.filter(item => !item.adminOnly || isAdminOrHR);
+  const filteredNavItems = navItems.filter(item => {
+    if (item.adminOnly && !isAdminOrHR) return false;
+    if (item.employeeOnly && isAdminOrHR) return false;
+    return true;
+  });
   
   // For auto-updating environments, show the latest version from GitHub
   // For self-hosted: if there's no update (up to date), show the latest from GitHub
