@@ -46,7 +46,7 @@ export function useAttendanceReportData(month: number, year: number) {
             employee_code, 
             working_hours_start, 
             working_hours_end,
-            department:departments(name)
+            department:departments!employees_department_id_fkey(name)
           )
         `)
         .gte("date", start)
