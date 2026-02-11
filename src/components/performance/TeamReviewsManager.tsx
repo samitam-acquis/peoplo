@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Star, FileText, Loader2, Plus, Users, CheckCircle, Edit2, Target } from "lucide-react";
+import { Star, FileText, Loader2, Plus, Users, CheckCircle, Edit2, Target, ListChecks } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCreateReview, useUpdateReview } from "@/hooks/usePerformance";
@@ -67,6 +68,7 @@ const statusColors: Record<string, string> = {
 
 export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManagerProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<TeamMember | null>(null);
   const [editingReview, setEditingReview] = useState<TeamReview | null>(null);
   const [formData, setFormData] = useState({
@@ -77,6 +79,8 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
     comments: "",
   });
   const [kpiManagerRatings, setKpiManagerRatings] = useState<Record<string, number>>({});
+  const [bulkReviewPeriod, setBulkReviewPeriod] = useState(`Q${Math.ceil((new Date().getMonth() + 1) / 3)} ${new Date().getFullYear()}`);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
 
   const queryClient = useQueryClient();
   const createReviewMutation = useCreateReview();
@@ -282,6 +286,59 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
     resetForm();
   };
 
+  const handleBulkSubmit = async () => {
+    if (bulkSelectedIds.size === 0) {
+      toast.error("Please select at least one team member");
+      return;
+    }
+    if (!bulkReviewPeriod.trim()) {
+      toast.error("Please enter a review period");
+      return;
+    }
+
+    const selectedMembers = teamMembers!.filter(m => bulkSelectedIds.has(m.id));
+    let created = 0;
+    for (const member of selectedMembers) {
+      try {
+        await createReviewMutation.mutateAsync({
+          employee_id: member.id,
+          reviewer_id: managerId,
+          reviewer_name: managerName,
+          review_period: bulkReviewPeriod,
+          review_date: new Date().toISOString().split("T")[0],
+          overall_rating: null,
+          status: "draft",
+        });
+        created++;
+      } catch (e) {
+        toast.error(`Failed to create review for ${member.first_name} ${member.last_name}`);
+      }
+    }
+
+    if (created > 0) {
+      toast.success(`Created ${created} draft review(s)`);
+    }
+    setIsBulkDialogOpen(false);
+    setBulkSelectedIds(new Set());
+  };
+
+  const toggleBulkSelect = (id: string) => {
+    setBulkSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!teamMembers) return;
+    if (bulkSelectedIds.size === teamMembers.length) {
+      setBulkSelectedIds(new Set());
+    } else {
+      setBulkSelectedIds(new Set(teamMembers.map(m => m.id)));
+    }
+  };
+
   const renderStars = (rating: number, interactive = false, onChange?: (r: number) => void) => (
     <div className="flex items-center gap-1">
       {[1, 2, 3, 4, 5].map((star) => (
@@ -330,7 +387,12 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-3">
-            <h4 className="font-medium text-sm text-muted-foreground">Your Team</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-sm text-muted-foreground">Your Team</h4>
+              <Button size="sm" variant="outline" onClick={() => { setBulkSelectedIds(new Set()); setIsBulkDialogOpen(true); }}>
+                <ListChecks className="h-4 w-4 mr-1" />Bulk Review
+              </Button>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {teamMembers.map(employee => (
                 <div key={employee.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
@@ -493,6 +555,54 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
             <Button onClick={() => handleSubmit("submitted")} disabled={isPending || formData.overall_rating === 0}>
               {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Submit Review
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Review Dialog */}
+      <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bulk Create Draft Reviews</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Review Period</Label>
+              <Input value={bulkReviewPeriod} onChange={(e) => setBulkReviewPeriod(e.target.value)} placeholder="e.g., Q1 2026, Annual 2025" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Select Team Members</Label>
+                <Button size="sm" variant="ghost" onClick={toggleSelectAll}>
+                  {bulkSelectedIds.size === (teamMembers?.length || 0) ? "Deselect All" : "Select All"}
+                </Button>
+              </div>
+              <div className="rounded-md border divide-y max-h-60 overflow-y-auto">
+                {teamMembers?.map(member => (
+                  <label key={member.id} className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer transition-colors">
+                    <Checkbox checked={bulkSelectedIds.has(member.id)} onCheckedChange={() => toggleBulkSelect(member.id)} />
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={member.avatar_url || undefined} />
+                      <AvatarFallback className="text-xs">{member.first_name[0]}{member.last_name[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{member.first_name} {member.last_name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{member.designation}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {bulkSelectedIds.size > 0 && (
+                <p className="text-xs text-muted-foreground">{bulkSelectedIds.size} member(s) selected</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setIsBulkDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleBulkSubmit} disabled={isPending || bulkSelectedIds.size === 0 || !bulkReviewPeriod.trim()}>
+              {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create {bulkSelectedIds.size} Draft{bulkSelectedIds.size !== 1 ? "s" : ""}
             </Button>
           </DialogFooter>
         </DialogContent>
