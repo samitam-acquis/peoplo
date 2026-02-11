@@ -421,8 +421,10 @@ export type Database = {
           description: string | null
           due_date: string | null
           employee_id: string
+          employee_rating: number | null
           id: string
           last_reminder_sent: string | null
+          manager_rating: number | null
           priority: string | null
           progress: number | null
           status: string
@@ -436,8 +438,10 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           employee_id: string
+          employee_rating?: number | null
           id?: string
           last_reminder_sent?: string | null
+          manager_rating?: number | null
           priority?: string | null
           progress?: number | null
           status?: string
@@ -451,8 +455,10 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           employee_id?: string
+          employee_rating?: number | null
           id?: string
           last_reminder_sent?: string | null
+          manager_rating?: number | null
           priority?: string | null
           progress?: number | null
           status?: string

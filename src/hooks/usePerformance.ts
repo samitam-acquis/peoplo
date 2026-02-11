@@ -14,6 +14,8 @@ export interface Goal {
   due_date: string | null;
   completed_at: string | null;
   created_at: string;
+  employee_rating: number | null;
+  manager_rating: number | null;
 }
 
 export interface PerformanceReview {

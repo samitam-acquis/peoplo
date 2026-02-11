@@ -4,10 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Target, Plus, Loader2, Trash2, Edit2, Calendar } from "lucide-react";
 import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal, Goal } from "@/hooks/usePerformance";
+import { RatingStars } from "./RatingStars";
 import { format } from "date-fns";
 
 interface GoalsManagerProps {
@@ -128,14 +127,12 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
     resetForm();
   };
 
-  const handleProgressUpdate = (goal: Goal, progress: number) => {
-    const status = progress === 100 ? "completed" : progress > 0 ? "in_progress" : "not_started";
+  const handleEmployeeRating = (goal: Goal, rating: number) => {
     updateMutation.mutate({
       id: goal.id,
       employeeId,
-      progress,
-      status,
-      completed_at: progress === 100 ? new Date().toISOString() : null,
+      employee_rating: rating,
+      status: "in_progress",
     });
   };
 
@@ -156,13 +153,13 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
-              Goals
+              KPIs
             </CardTitle>
-            <CardDescription>Track progress on your KPIs and professional objectives</CardDescription>
+            <CardDescription>Track and rate your key performance indicators</CardDescription>
           </div>
           <Button onClick={openCreateDialog}>
             <Plus className="h-4 w-4 mr-2" />
-            Add Goal
+            Add KPI
           </Button>
         </CardHeader>
         <CardContent>
@@ -189,9 +186,9 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Goal</AlertDialogTitle>
+                            <AlertDialogTitle>Delete KPI</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Are you sure you want to delete this goal? This action cannot be undone.
+                              Are you sure you want to delete this KPI? This action cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -222,18 +219,23 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
                     )}
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium">{goal.progress}%</span>
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between">
+                      <RatingStars
+                        label="My Rating"
+                        value={goal.employee_rating}
+                        onChange={(rating) => handleEmployeeRating(goal, rating)}
+                        size="sm"
+                      />
                     </div>
-                    <Slider
-                      value={[goal.progress]}
-                      max={100}
-                      step={5}
-                      onValueCommit={(value) => handleProgressUpdate(goal, value[0])}
-                      className="cursor-pointer"
-                    />
+                    <div className="flex items-center justify-between">
+                      <RatingStars
+                        label="Manager"
+                        value={goal.manager_rating}
+                        readonly
+                        size="sm"
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -241,8 +243,8 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Target className="mx-auto h-8 w-8 mb-2 opacity-50" />
-              <p>No goals set yet</p>
-              <p className="text-sm">Create your first goal to start tracking progress</p>
+              <p>No KPIs set yet</p>
+              <p className="text-sm">Create your first KPI to start tracking performance</p>
             </div>
           )}
         </CardContent>
@@ -251,7 +253,7 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingGoal ? "Edit Goal" : "Create New Goal"}</DialogTitle>
+            <DialogTitle>{editingGoal ? "Edit KPI" : "Create New KPI"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -259,7 +261,7 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
               <Input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Enter goal title"
+                placeholder="Enter KPI title"
               />
             </div>
             <div className="space-y-2">
@@ -267,7 +269,7 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
               <Textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe your goal..."
+                placeholder="Describe your KPI..."
                 rows={3}
               />
             </div>
@@ -336,7 +338,7 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
               {(createMutation.isPending || updateMutation.isPending) && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
-              {editingGoal ? "Save Changes" : "Create Goal"}
+              {editingGoal ? "Save Changes" : "Create KPI"}
             </Button>
           </DialogFooter>
         </DialogContent>
