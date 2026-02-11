@@ -96,7 +96,7 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
   const filteredGoals = goals?.filter((goal) => filterByDateRange(goal.created_at)) || [];
   const filteredReviews = reviews?.filter((review) => filterByDateRange(review.review_date)) || [];
 
-  // Process goals data for status distribution
+  // Process KPIs data for status distribution
   const goalStatusData = filteredGoals.reduce((acc, goal) => {
     const status = goal.status || "not_started";
     const existing = acc.find((item) => item.status === status);
@@ -122,7 +122,7 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
     on_hold: "hsl(38 92% 50%)",
   };
 
-  // Process goals for monthly completion trend
+  // Process KPIs for monthly completion trend
   const monthlyGoalsTrend = filteredGoals.reduce((acc, goal) => {
     if (goal.completed_at && filterByDateRange(goal.completed_at)) {
       const month = new Date(goal.completed_at).toLocaleDateString("en-US", {
@@ -177,12 +177,12 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
     csvContent += `Date Range: ${startDate ? format(startDate, "PPP") : "All"} to ${endDate ? format(endDate, "PPP") : "All"}\n\n`;
     
     csvContent += "SUMMARY\n";
-    csvContent += `Total Goals,${filteredGoals.length}\n`;
+    csvContent += `Total KPIs,${filteredGoals.length}\n`;
     csvContent += `Average Progress,${avgProgress}%\n`;
     csvContent += `Total Reviews,${filteredReviews.length}\n`;
-    csvContent += `Average Rating,${avgRating}\n\n`;
+     csvContent += `Average Rating,${avgRating}\n\n`;
     
-    csvContent += "GOALS\n";
+     csvContent += "KPIs\n";
     csvContent += "Title,Status,Progress,Priority,Due Date,Created At\n";
     filteredGoals.forEach((goal) => {
       csvContent += `"${goal.title}",${goal.status},${goal.progress || 0}%,${goal.priority || "N/A"},${goal.due_date || "N/A"},${goal.created_at ? format(new Date(goal.created_at), "yyyy-MM-dd") : "N/A"}\n`;
@@ -221,7 +221,7 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
       startY: 50,
       head: [["Metric", "Value"]],
       body: [
-        ["Total Goals", filteredGoals.length.toString()],
+        ["Total KPIs", filteredGoals.length.toString()],
         ["Average Progress", `${avgProgress}%`],
         ["Total Reviews", filteredReviews.length.toString()],
         ["Average Rating", avgRating.toString()],
@@ -232,7 +232,7 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
     // Goals section
     const goalsStartY = (doc as any).lastAutoTable.finalY + 15;
     doc.setFontSize(14);
-    doc.text("Goals", 14, goalsStartY);
+    doc.text("KPIs", 14, goalsStartY);
     
     if (filteredGoals.length > 0) {
       autoTable(doc, {
@@ -361,7 +361,7 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold">{filteredGoals.length}</div>
-            <p className="text-sm text-muted-foreground">Total Goals</p>
+            <p className="text-sm text-muted-foreground">Total KPIs</p>
           </CardContent>
         </Card>
         <Card>
@@ -385,10 +385,10 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Goal Status Distribution */}
+        {/* KPI Status Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Goal Status Distribution</CardTitle>
+            <CardTitle className="text-base">KPI Status Distribution</CardTitle>
           </CardHeader>
           <CardContent>
             {hasGoalData ? (
@@ -424,7 +424,7 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
               </ResponsiveContainer>
             ) : (
               <div className="flex h-[250px] items-center justify-center text-muted-foreground">
-                No goals data in selected range
+                No KPI data in selected range
               </div>
             )}
           </CardContent>
@@ -469,10 +469,10 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
           </CardContent>
         </Card>
 
-        {/* Goals Completion Trend */}
+        {/* KPIs Completion Trend */}
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Goals Completed Over Time</CardTitle>
+            <CardTitle className="text-base">KPIs Completed Over Time</CardTitle>
           </CardHeader>
           <CardContent>
             {monthlyGoalsTrend.length > 0 ? (
@@ -499,7 +499,7 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
               </ResponsiveContainer>
             ) : (
               <div className="flex h-[250px] items-center justify-center text-muted-foreground">
-                No completed goals in selected range
+                No completed KPIs in selected range
               </div>
             )}
           </CardContent>
