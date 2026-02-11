@@ -1,7 +1,7 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { Target, FileText, Loader2, User, BarChart3, Users } from "lucide-react";
+import { Target, FileText, Loader2, User, BarChart3, Users, TrendingUp } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { PerformanceReviews } from "@/components/performance/PerformanceReviews"
 import { PerformanceAnalytics } from "@/components/performance/PerformanceAnalytics";
 import { TeamGoalsView } from "@/components/performance/TeamGoalsView";
 import { TeamReviewsManager } from "@/components/performance/TeamReviewsManager";
+import { TeamAnalytics } from "@/components/performance/TeamAnalytics";
 
 const Performance = () => {
   const { user } = useAuth();
@@ -112,6 +113,12 @@ const Performance = () => {
                 Team
               </TabsTrigger>
             )}
+            {employeeData.isManager && (
+              <TabsTrigger value="team-analytics" className="gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Team Analytics
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="kpis">
@@ -135,6 +142,15 @@ const Performance = () => {
               <TeamReviewsManager 
                 managerId={employeeData.id} 
                 managerName={employeeName}
+              />
+            </TabsContent>
+          )}
+
+          {employeeData.isManager && (
+            <TabsContent value="team-analytics">
+              <TeamAnalytics
+                isManager={true}
+                managerId={employeeData.id}
               />
             </TabsContent>
           )}
