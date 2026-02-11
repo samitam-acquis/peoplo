@@ -317,6 +317,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
 
     if (created > 0) {
       toast.success(`Created ${created} draft review(s)`);
+      queryClient.invalidateQueries({ queryKey: ["team-reviews-by-manager", managerId] });
     }
     setIsBulkDialogOpen(false);
     setBulkSelectedIds(new Set());
