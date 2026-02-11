@@ -132,15 +132,15 @@ export function useClockOut() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ recordId, clockIn, location }: { recordId: string; clockIn: string; location?: LocationData }) => {
-      const now = new Date();
+    mutationFn: async ({ recordId, clockIn, location, customClockOut }: { recordId: string; clockIn: string; location?: LocationData; customClockOut?: Date }) => {
+      const clockOutTime = customClockOut || new Date();
       const clockInTime = new Date(clockIn);
-      const totalHours = (now.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
+      const totalHours = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
 
       const { data, error } = await supabase
         .from("attendance_records")
         .update({
-          clock_out: now.toISOString(),
+          clock_out: clockOutTime.toISOString(),
           total_hours: Math.round(totalHours * 100) / 100,
           clock_out_latitude: location?.latitude,
           clock_out_longitude: location?.longitude,

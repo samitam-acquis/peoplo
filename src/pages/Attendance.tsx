@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -70,6 +72,9 @@ const Attendance = () => {
   const [workMode, setWorkMode] = useState<WorkMode>('wfo');
   const [showEarlyClockOutWarning, setShowEarlyClockOutWarning] = useState(false);
   const [earlyClockOutReasons, setEarlyClockOutReasons] = useState<{ beforeEndTime: boolean; insufficientHours: boolean }>({ beforeEndTime: false, insufficientHours: false });
+  const [showLateClockOutDialog, setShowLateClockOutDialog] = useState(false);
+  const [lateClockOutMode, setLateClockOutMode] = useState<"overtime" | "missed" | null>(null);
+  const [missedClockOutTime, setMissedClockOutTime] = useState("");
   
 
   const targetDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), 1);
@@ -313,7 +318,44 @@ const Attendance = () => {
       setEarlyClockOutReasons({ beforeEndTime, insufficientHours });
       setShowEarlyClockOutWarning(true);
     } else {
+      // Past end time — check if overtime or missed clock-out
+      const isAfterEndTime = !isBeforeEndTime();
+      if (isAfterEndTime && hoursWorked > requiredHours) {
+        setLateClockOutMode(null);
+        setMissedClockOutTime(workEnd.substring(0, 5));
+        setShowLateClockOutDialog(true);
+      } else {
+        handleClockOut();
+      }
+    }
+  };
+
+  const handleLateClockOutConfirm = async () => {
+    if (!todayRecord || !todayRecord.clock_in) return;
+    setShowLateClockOutDialog(false);
+
+    if (lateClockOutMode === "overtime") {
       handleClockOut();
+    } else if (lateClockOutMode === "missed" && missedClockOutTime) {
+      try {
+        toast.info("Getting your location...");
+        const location = await getCurrentLocation();
+        
+        // Build clock-out date from today's date + entered time
+        const [hours, minutes] = missedClockOutTime.split(":").map(Number);
+        const customTime = new Date(todayRecord.clock_in);
+        customTime.setHours(hours, minutes, 0, 0);
+        
+        // If custom time is before clock-in, it might be next day (cross-midnight)
+        if (customTime <= new Date(todayRecord.clock_in)) {
+          customTime.setDate(customTime.getDate() + 1);
+        }
+        
+        await clockOut.mutateAsync({ recordId: todayRecord.id, clockIn: todayRecord.clock_in, location, customClockOut: customTime });
+        toast.success("Clocked out with corrected time");
+      } catch (error) {
+        toast.error("Failed to clock out");
+      }
     }
   };
 
@@ -923,6 +965,64 @@ const Attendance = () => {
             <AlertDialogCancel>Continue Working</AlertDialogCancel>
             <AlertDialogAction onClick={handleClockOut}>
               Clock Out Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Late Clock-Out Dialog */}
+      <AlertDialog open={showLateClockOutDialog} onOpenChange={setShowLateClockOutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Timer className="h-5 w-5 text-orange-500" />
+              Clock Out After End Time
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p>
+                  Your scheduled end time was <span className="font-semibold">{formatTimeDisplay(currentEmployee?.working_hours_end || "18:00:00")}</span> and you've worked <span className="font-semibold">{formatHoursWorked(calculateCurrentHoursWorked())}</span>.
+                </p>
+                <p>Was this overtime or did you forget to clock out?</p>
+                <div className="flex flex-col gap-2 pt-2">
+                  <Button
+                    variant={lateClockOutMode === "overtime" ? "default" : "outline"}
+                    className="justify-start"
+                    onClick={() => setLateClockOutMode("overtime")}
+                  >
+                    <Timer className="mr-2 h-4 w-4" />
+                    It was overtime — use current time
+                  </Button>
+                  <Button
+                    variant={lateClockOutMode === "missed" ? "default" : "outline"}
+                    className="justify-start"
+                    onClick={() => setLateClockOutMode("missed")}
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    I forgot to clock out — enter actual time
+                  </Button>
+                </div>
+                {lateClockOutMode === "missed" && (
+                  <div className="space-y-2 pt-2">
+                    <Label htmlFor="missed-time">Actual clock-out time</Label>
+                    <Input
+                      id="missed-time"
+                      type="time"
+                      value={missedClockOutTime}
+                      onChange={(e) => setMissedClockOutTime(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setLateClockOutMode(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleLateClockOutConfirm}
+              disabled={!lateClockOutMode || (lateClockOutMode === "missed" && !missedClockOutTime)}
+            >
+              Confirm Clock Out
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
