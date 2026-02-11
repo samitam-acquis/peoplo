@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -26,10 +25,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Target, Loader2, Calendar, Users, Save, Check, Plus, Trash2, Edit2 } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Target, Loader2, Calendar, Users, Plus, Trash2, Edit2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCreateGoal, useUpdateGoal, useDeleteGoal } from "@/hooks/usePerformance";
+import { RatingStars } from "./RatingStars";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -52,6 +52,8 @@ interface TeamMemberWithGoals {
     status: string;
     progress: number;
     due_date: string | null;
+    employee_rating: number | null;
+    manager_rating: number | null;
   }[];
 }
 
@@ -70,8 +72,6 @@ const priorityColors: Record<string, string> = {
 
 export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
-  const [editingGoal, setEditingGoal] = useState<string | null>(null);
-  const [pendingProgress, setPendingProgress] = useState<Record<string, number>>({});
   const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
   const [editingGoalData, setEditingGoalData] = useState<{ id: string; employeeId: string } | null>(null);
   const [goalForm, setGoalForm] = useState({
@@ -91,7 +91,6 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
   const { data: teamData, isLoading } = useQuery({
     queryKey: ["team-goals", managerId],
     queryFn: async () => {
-      // Get team members managed by this manager
       const { data: employees, error: empError } = await supabase
         .from("employees")
         .select("id, first_name, last_name, designation, avatar_url")
@@ -101,7 +100,6 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
       if (empError) throw empError;
       if (!employees || employees.length === 0) return [];
 
-      // Get goals for all team members
       const { data: goals, error: goalsError } = await supabase
         .from("goals")
         .select("*")
@@ -110,7 +108,6 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
 
       if (goalsError) throw goalsError;
 
-      // Combine employees with their goals
       const result: TeamMemberWithGoals[] = employees.map(emp => ({
         ...emp,
         goals: (goals || []).filter(g => g.employee_id === emp.id),
@@ -121,64 +118,16 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
     enabled: !!managerId,
   });
 
-  const updateProgressMutation = useMutation({
-    mutationFn: async ({ goalId, progress, status }: { goalId: string; progress: number; status: string }) => {
-      const { error } = await supabase
-        .from("goals")
-        .update({ 
-          progress, 
-          status,
-          completed_at: status === "completed" ? new Date().toISOString() : null 
-        })
-        .eq("id", goalId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["team-goals", managerId] });
-      toast.success("Goal progress updated");
-      setEditingGoal(null);
-    },
-    onError: (error) => {
-      toast.error("Failed to update progress: " + error.message);
-    },
-  });
-
-  const handleProgressChange = (goalId: string, value: number[]) => {
-    setPendingProgress(prev => ({ ...prev, [goalId]: value[0] }));
-  };
-
-  const handleSaveProgress = (goalId: string, currentStatus: string) => {
-    const progress = pendingProgress[goalId];
-    if (progress === undefined) return;
-
-    let newStatus = currentStatus;
-    if (progress === 100) {
-      newStatus = "completed";
-    } else if (progress > 0 && currentStatus === "not_started") {
-      newStatus = "in_progress";
-    }
-
-    updateProgressMutation.mutate({ goalId, progress, status: newStatus });
-    setPendingProgress(prev => {
-      const updated = { ...prev };
-      delete updated[goalId];
-      return updated;
-    });
-  };
-
-  const startEditing = (goalId: string, currentProgress: number) => {
-    setEditingGoal(goalId);
-    setPendingProgress(prev => ({ ...prev, [goalId]: currentProgress }));
-  };
-
-  const cancelEditing = (goalId: string) => {
-    setEditingGoal(null);
-    setPendingProgress(prev => {
-      const updated = { ...prev };
-      delete updated[goalId];
-      return updated;
-    });
+  const handleManagerRating = (goalId: string, employeeId: string, rating: number) => {
+    updateGoalMutation.mutate(
+      { id: goalId, employeeId, manager_rating: rating },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["team-goals", managerId] });
+          toast.success("Manager rating updated");
+        },
+      }
+    );
   };
 
   const resetGoalForm = () => {
@@ -276,9 +225,9 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Target className="h-5 w-5" />
-            Team Goals
+            Team KPIs
           </CardTitle>
-          <CardDescription>View goals for your team members</CardDescription>
+          <CardDescription>View and rate KPIs for your team members</CardDescription>
         </CardHeader>
         <CardContent className="text-center py-8 text-muted-foreground">
           <Users className="mx-auto h-8 w-8 mb-2 opacity-50" />
@@ -293,9 +242,9 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
     ? teamData 
     : teamData.filter(emp => emp.id === selectedEmployee);
 
-  const totalGoals = teamData.reduce((sum, emp) => sum + emp.goals.length, 0);
-  const completedGoals = teamData.reduce(
-    (sum, emp) => sum + emp.goals.filter(g => g.status === "completed").length, 
+  const totalKPIs = teamData.reduce((sum, emp) => sum + emp.goals.length, 0);
+  const ratedKPIs = teamData.reduce(
+    (sum, emp) => sum + emp.goals.filter(g => g.manager_rating !== null).length, 
     0
   );
 
@@ -306,10 +255,10 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
         <div>
           <CardTitle className="flex items-center gap-2">
             <Target className="h-5 w-5" />
-            Team Goals
+            Team KPIs
           </CardTitle>
           <CardDescription>
-            {totalGoals} total goals • {completedGoals} completed
+            {totalKPIs} total KPIs • {ratedKPIs} rated
           </CardDescription>
         </div>
         <div className="flex items-center gap-2">
@@ -328,7 +277,7 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
           </Select>
           <Button onClick={() => openAddGoalDialog()}>
             <Plus className="h-4 w-4 mr-2" />
-            Add Goal
+            Add KPI
           </Button>
         </div>
       </CardHeader>
@@ -336,7 +285,6 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
         <div className="space-y-6">
           {filteredData.map(employee => (
             <div key={employee.id} className="space-y-3">
-              {/* Employee Header */}
               <div className="flex items-center gap-3 pb-2 border-b">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={employee.avatar_url || undefined} />
@@ -349,11 +297,10 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
                   <p className="text-xs text-muted-foreground">{employee.designation}</p>
                 </div>
                 <Badge variant="outline" className="ml-auto">
-                  {employee.goals.length} goals
+                  {employee.goals.length} KPIs
                 </Badge>
               </div>
 
-              {/* Employee Goals */}
               {employee.goals.length > 0 ? (
                 <div className="space-y-3 pl-11">
                   {employee.goals.map(goal => (
@@ -379,7 +326,7 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Goal</AlertDialogTitle>
+                                <AlertDialogTitle>Delete KPI</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   Are you sure you want to delete "{goal.title}"? This action cannot be undone.
                                 </AlertDialogDescription>
@@ -410,58 +357,26 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
                         )}
                       </div>
 
-                      {editingGoal === goal.id ? (
-                        <div className="flex items-center gap-2">
-                          <Slider
-                            value={[pendingProgress[goal.id] ?? goal.progress]}
-                            onValueChange={(value) => handleProgressChange(goal.id, value)}
-                            max={100}
-                            step={5}
-                            className="flex-1"
-                          />
-                          <span className="text-xs font-medium w-10 text-right">
-                            {pendingProgress[goal.id] ?? goal.progress}%
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0"
-                            onClick={() => handleSaveProgress(goal.id, goal.status)}
-                            disabled={updateProgressMutation.isPending}
-                          >
-                            <Check className="h-4 w-4 text-primary" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0"
-                            onClick={() => cancelEditing(goal.id)}
-                          >
-                            ✕
-                          </Button>
-                        </div>
-                      ) : (
-                        <div 
-                          className="flex items-center gap-2 cursor-pointer group"
-                          onClick={() => startEditing(goal.id, goal.progress)}
-                          title="Click to edit progress"
-                        >
-                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-primary transition-all" 
-                              style={{ width: `${goal.progress}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-medium w-10 text-right">{goal.progress}%</span>
-                          <Save className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                      )}
+                      <div className="space-y-1.5 pt-1">
+                        <RatingStars
+                          label="Employee"
+                          value={goal.employee_rating}
+                          readonly
+                          size="sm"
+                        />
+                        <RatingStars
+                          label="Manager"
+                          value={goal.manager_rating}
+                          onChange={(rating) => handleManagerRating(goal.id, employee.id, rating)}
+                          size="sm"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="pl-11 flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground">No goals set</p>
+                  <p className="text-sm text-muted-foreground">No KPIs set</p>
                   <Button variant="link" size="sm" className="text-xs" onClick={() => openAddGoalDialog(employee.id)}>
                     <Plus className="h-3 w-3 mr-1" /> Add one
                   </Button>
@@ -473,11 +388,11 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
       </CardContent>
     </Card>
 
-    {/* Add/Edit Goal Dialog */}
+    {/* Add/Edit KPI Dialog */}
     <Dialog open={isGoalDialogOpen} onOpenChange={setIsGoalDialogOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{editingGoalData ? "Edit Goal" : "Add Goal for Team Member"}</DialogTitle>
+          <DialogTitle>{editingGoalData ? "Edit KPI" : "Add KPI for Team Member"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           {!editingGoalData && (
@@ -502,7 +417,7 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
             <Input
               value={goalForm.title}
               onChange={(e) => setGoalForm(prev => ({ ...prev, title: e.target.value }))}
-              placeholder="Enter KPI / goal title"
+              placeholder="Enter KPI title"
             />
           </div>
           <div className="space-y-2">
@@ -510,7 +425,7 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
             <Textarea
               value={goalForm.description}
               onChange={(e) => setGoalForm(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Describe the goal or KPI..."
+              placeholder="Describe the KPI..."
               rows={3}
             />
           </div>
@@ -567,7 +482,7 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
             {(createGoalMutation.isPending || updateGoalMutation.isPending) && (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             )}
-            {editingGoalData ? "Save Changes" : "Add Goal"}
+            {editingGoalData ? "Save Changes" : "Add KPI"}
           </Button>
         </DialogFooter>
       </DialogContent>
