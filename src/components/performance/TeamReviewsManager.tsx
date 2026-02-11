@@ -455,7 +455,18 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
             )}
 
             <div className="space-y-2">
-              <Label>Overall Rating</Label>
+              <div className="flex items-center justify-between">
+                <Label>Overall Rating</Label>
+                {formData.overall_rating > 0 && (
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    onClick={() => setFormData({ ...formData, overall_rating: 0 })}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
               {renderStars(formData.overall_rating, true, (r) => setFormData({ ...formData, overall_rating: r }))}
             </div>
 
