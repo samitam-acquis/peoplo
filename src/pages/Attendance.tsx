@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -37,9 +39,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import { DateRangeExportDialog } from "@/components/export/DateRangeExportDialog";
 
 const MONTHS = [
   { value: "0", label: "January" },
@@ -73,6 +72,10 @@ const Attendance = () => {
   const [workMode, setWorkMode] = useState<WorkMode>('wfo');
   const [showEarlyClockOutWarning, setShowEarlyClockOutWarning] = useState(false);
   const [earlyClockOutReasons, setEarlyClockOutReasons] = useState<{ beforeEndTime: boolean; insufficientHours: boolean }>({ beforeEndTime: false, insufficientHours: false });
+  const [showLateClockOutDialog, setShowLateClockOutDialog] = useState(false);
+  const [lateClockOutMode, setLateClockOutMode] = useState<"overtime" | "missed" | null>(null);
+  const [missedClockOutTime, setMissedClockOutTime] = useState("");
+  
 
   const targetDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), 1);
 
@@ -174,14 +177,8 @@ const Attendance = () => {
     return attendanceRecords.filter(record => calculateLateArrival(record.clock_in, record.employee) > 0).length;
   };
 
-  // Sorting for report data
-  const reportSorting = useSorting(reportData || []);
-  
   // Sorting for attendance history
   const historySorting = useSorting(attendanceRecords || []);
-
-  // Pagination for report data (uses sorted items)
-  const reportPagination = usePagination(reportSorting.sortedItems, { initialPageSize: 10 });
   
   // Pagination for attendance history (uses sorted items)
   const historyPagination = usePagination(historySorting.sortedItems, { initialPageSize: 10 });
@@ -321,7 +318,44 @@ const Attendance = () => {
       setEarlyClockOutReasons({ beforeEndTime, insufficientHours });
       setShowEarlyClockOutWarning(true);
     } else {
+      // Past end time — check if overtime or missed clock-out
+      const isAfterEndTime = !isBeforeEndTime();
+      if (isAfterEndTime && hoursWorked > requiredHours) {
+        setLateClockOutMode(null);
+        setMissedClockOutTime(workEnd.substring(0, 5));
+        setShowLateClockOutDialog(true);
+      } else {
+        handleClockOut();
+      }
+    }
+  };
+
+  const handleLateClockOutConfirm = async () => {
+    if (!todayRecord || !todayRecord.clock_in) return;
+    setShowLateClockOutDialog(false);
+
+    if (lateClockOutMode === "overtime") {
       handleClockOut();
+    } else if (lateClockOutMode === "missed" && missedClockOutTime) {
+      try {
+        toast.info("Getting your location...");
+        const location = await getCurrentLocation();
+        
+        // Build clock-out date from today's date + entered time
+        const [hours, minutes] = missedClockOutTime.split(":").map(Number);
+        const customTime = new Date(todayRecord.clock_in);
+        customTime.setHours(hours, minutes, 0, 0);
+        
+        // If custom time is before clock-in, it might be next day (cross-midnight)
+        if (customTime <= new Date(todayRecord.clock_in)) {
+          customTime.setDate(customTime.getDate() + 1);
+        }
+        
+        await clockOut.mutateAsync({ recordId: todayRecord.id, clockIn: todayRecord.clock_in, location, customClockOut: customTime });
+        toast.success("Clocked out with corrected time");
+      } catch (error) {
+        toast.error("Failed to clock out");
+      }
     }
   };
 
@@ -350,77 +384,6 @@ const Attendance = () => {
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
   };
 
-  const exportToCSV = (startDate?: Date, endDate?: Date) => {
-    if (!reportData || reportData.length === 0) return;
-
-    const monthName = MONTHS[parseInt(selectedMonth)].label;
-    const headers = ["Employee Code", "Name", "Department", "Present Days", "Total Hours", "Avg Hours/Day"];
-    const csvContent = [
-      headers.join(","),
-      ...reportData.map((emp) =>
-        [
-          `"${emp.employeeCode}"`,
-          `"${emp.employeeName}"`,
-          `"${emp.department}"`,
-          `"${emp.presentDays}"`,
-          `"${emp.totalHours.toFixed(2)}"`,
-          `"${emp.totalDays > 0 ? (emp.totalHours / emp.totalDays).toFixed(2) : "0"}"`,
-        ].join(",")
-      ),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    const dateRange = startDate || endDate 
-      ? `-${startDate ? format(startDate, "yyyy-MM-dd") : "start"}-to-${endDate ? format(endDate, "yyyy-MM-dd") : "end"}` 
-      : `-${monthName.toLowerCase()}-${selectedYear}`;
-    link.download = `attendance-report${dateRange}.csv`;
-    link.click();
-    toast.success(`${reportData.length} attendance records exported to CSV`);
-  };
-
-  const exportToPDF = (startDate?: Date, endDate?: Date) => {
-    if (!reportData || reportData.length === 0) return;
-
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const monthName = MONTHS[parseInt(selectedMonth)].label;
-
-    doc.setFontSize(20);
-    doc.text("Attendance Report", pageWidth / 2, 20, { align: "center" });
-
-    doc.setFontSize(12);
-    if (startDate || endDate) {
-      doc.text(`${startDate ? format(startDate, "PP") : "Start"} - ${endDate ? format(endDate, "PP") : "End"}`, pageWidth / 2, 28, { align: "center" });
-    } else {
-      doc.text(`${monthName} ${selectedYear}`, pageWidth / 2, 28, { align: "center" });
-    }
-
-    doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth / 2, 35, { align: "center" });
-
-    autoTable(doc, {
-      startY: 45,
-      head: [["Employee Code", "Name", "Department", "Present Days", "Total Hours", "Avg Hours/Day"]],
-      body: reportData.map((emp) => [
-        emp.employeeCode,
-        emp.employeeName,
-        emp.department,
-        emp.presentDays.toString(),
-        emp.totalHours.toFixed(2),
-        emp.totalDays > 0 ? (emp.totalHours / emp.totalDays).toFixed(2) : "0",
-      ]),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [59, 130, 246] },
-    });
-
-    const dateRange = startDate || endDate 
-      ? `-${startDate ? format(startDate, "yyyy-MM-dd") : "start"}-to-${endDate ? format(endDate, "yyyy-MM-dd") : "end"}` 
-      : `-${monthName.toLowerCase()}-${selectedYear}`;
-    doc.save(`attendance-report${dateRange}.pdf`);
-    toast.success(`${reportData.length} attendance records exported to PDF`);
-  };
 
   const currentTime = new Date();
   const isClockedIn = todayRecord?.clock_in && !todayRecord?.clock_out;
@@ -669,167 +632,54 @@ const Attendance = () => {
           </Card>
         )}
 
-        {/* Monthly Report */}
+        {/* My Monthly Summary */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader>
             <div className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle>Monthly Attendance Report</CardTitle>
+                <CardTitle>My Monthly Summary</CardTitle>
                 <CardDescription>
                   {MONTHS[parseInt(selectedMonth)].label} {selectedYear}
                 </CardDescription>
               </div>
             </div>
-            <DateRangeExportDialog
-              title="Export Attendance Report"
-              description={`Export attendance report for ${MONTHS[parseInt(selectedMonth)].label} ${selectedYear}. Use date filters for custom range or leave empty to export the selected month.`}
-              onExportCSV={exportToCSV}
-              onExportPDF={exportToPDF}
-              disabled={reportLoading || !reportData?.length}
-            />
           </CardHeader>
           <CardContent>
             {reportLoading ? (
-              <Skeleton className="h-64 w-full" />
-            ) : reportData && reportData.length > 0 ? (
-              <>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <SortableTableHead
-                        sortKey="employeeCode"
-                        currentSortKey={reportSorting.sortConfig.key as string | null}
-                        direction={reportSorting.sortConfig.key === "employeeCode" ? reportSorting.sortConfig.direction : null}
-                        onSort={(key) => reportSorting.requestSort(key as keyof typeof reportSorting.sortedItems[0])}
-                      >
-                        Employee Code
-                      </SortableTableHead>
-                      <SortableTableHead
-                        sortKey="employeeName"
-                        currentSortKey={reportSorting.sortConfig.key as string | null}
-                        direction={reportSorting.sortConfig.key === "employeeName" ? reportSorting.sortConfig.direction : null}
-                        onSort={(key) => reportSorting.requestSort(key as keyof typeof reportSorting.sortedItems[0])}
-                      >
-                        Name
-                      </SortableTableHead>
-                      <SortableTableHead
-                        sortKey="department"
-                        currentSortKey={reportSorting.sortConfig.key as string | null}
-                        direction={reportSorting.sortConfig.key === "department" ? reportSorting.sortConfig.direction : null}
-                        onSort={(key) => reportSorting.requestSort(key as keyof typeof reportSorting.sortedItems[0])}
-                      >
-                        Department
-                      </SortableTableHead>
-                      <SortableTableHead
-                        sortKey="presentDays"
-                        currentSortKey={reportSorting.sortConfig.key as string | null}
-                        direction={reportSorting.sortConfig.key === "presentDays" ? reportSorting.sortConfig.direction : null}
-                        onSort={(key) => reportSorting.requestSort(key as keyof typeof reportSorting.sortedItems[0])}
-                      >
-                        Present Days
-                      </SortableTableHead>
-                      <SortableTableHead
-                        sortKey="totalHours"
-                        currentSortKey={reportSorting.sortConfig.key as string | null}
-                        direction={reportSorting.sortConfig.key === "totalHours" ? reportSorting.sortConfig.direction : null}
-                        onSort={(key) => reportSorting.requestSort(key as keyof typeof reportSorting.sortedItems[0])}
-                      >
-                        Total Hours
-                      </SortableTableHead>
-                      <TableHead>Avg Hours/Day</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reportPagination.paginatedItems.map((emp) => (
-                      <TableRow key={emp.employeeId}>
-                        <TableCell className="font-medium">{emp.employeeCode}</TableCell>
-                        <TableCell>{emp.employeeName}</TableCell>
-                        <TableCell>{emp.department}</TableCell>
-                        <TableCell>{emp.presentDays}</TableCell>
-                        <TableCell>{emp.totalHours.toFixed(2)} hrs</TableCell>
-                        <TableCell>
-                          {emp.totalDays > 0 ? (emp.totalHours / emp.totalDays).toFixed(2) : "0"} hrs
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              {/* Pagination for report */}
-              {reportPagination.totalPages > 1 && (
-                <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Show</span>
-                    <Select value={reportPagination.pageSize.toString()} onValueChange={(v) => reportPagination.setPageSize(Number(v))}>
-                      <SelectTrigger className="h-8 w-[70px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[5, 10, 20, 50].map((size) => (
-                          <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <span>of {reportPagination.totalItems} records</span>
+              <Skeleton className="h-24 w-full" />
+            ) : (() => {
+              const myData = reportData?.find((emp) => emp.employeeId === currentEmployee?.id);
+              if (!myData) {
+                return (
+                  <div className="flex h-24 items-center justify-center text-muted-foreground">
+                    No attendance records for this month
                   </div>
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          onClick={() => reportPagination.canGoPrevious && reportPagination.goToPreviousPage()}
-                          className={!reportPagination.canGoPrevious ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                      {(() => {
-                        const pages: (number | "ellipsis")[] = [];
-                        const { currentPage, totalPages } = reportPagination;
-                        if (totalPages <= 7) {
-                          for (let i = 1; i <= totalPages; i++) pages.push(i);
-                        } else {
-                          pages.push(1);
-                          if (currentPage > 3) pages.push("ellipsis");
-                          for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-                            pages.push(i);
-                          }
-                          if (currentPage < totalPages - 2) pages.push("ellipsis");
-                          pages.push(totalPages);
-                        }
-                        return pages.map((page, idx) =>
-                          page === "ellipsis" ? (
-                            <PaginationItem key={`ellipsis-${idx}`}>
-                              <PaginationEllipsis />
-                            </PaginationItem>
-                          ) : (
-                            <PaginationItem key={page}>
-                              <PaginationLink
-                                onClick={() => reportPagination.setPage(page)}
-                                isActive={reportPagination.currentPage === page}
-                                className="cursor-pointer"
-                              >
-                                {page}
-                              </PaginationLink>
-                            </PaginationItem>
-                          )
-                        );
-                      })()}
-                      <PaginationItem>
-                        <PaginationNext
-                          onClick={() => reportPagination.canGoNext && reportPagination.goToNextPage()}
-                          className={!reportPagination.canGoNext ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
+                );
+              }
+              return (
+                <div className="grid gap-4 sm:grid-cols-4">
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <p className="text-sm text-muted-foreground">Present Days</p>
+                    <p className="text-2xl font-bold">{myData.presentDays}</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <p className="text-sm text-muted-foreground">Total Hours</p>
+                    <p className="text-2xl font-bold">{myData.totalHours.toFixed(1)}h</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <p className="text-sm text-muted-foreground">Avg Hours/Day</p>
+                    <p className="text-2xl font-bold">
+                      {myData.totalDays > 0 ? (myData.totalHours / myData.totalDays).toFixed(1) : "0"}h
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <p className="text-sm text-muted-foreground">Late Arrivals</p>
+                    <p className="text-2xl font-bold">{myData.lateDays}</p>
+                  </div>
                 </div>
-              )}
-              </>
-            ) : (
-              <div className="flex h-32 items-center justify-center text-muted-foreground">
-                No attendance records for this period
-              </div>
-            )}
+              );
+            })()}
           </CardContent>
         </Card>
 
@@ -1115,6 +965,64 @@ const Attendance = () => {
             <AlertDialogCancel>Continue Working</AlertDialogCancel>
             <AlertDialogAction onClick={handleClockOut}>
               Clock Out Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Late Clock-Out Dialog */}
+      <AlertDialog open={showLateClockOutDialog} onOpenChange={setShowLateClockOutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Timer className="h-5 w-5 text-orange-500" />
+              Clock Out After End Time
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p>
+                  Your scheduled end time was <span className="font-semibold">{formatTimeDisplay(currentEmployee?.working_hours_end || "18:00:00")}</span> and you've worked <span className="font-semibold">{formatHoursWorked(calculateCurrentHoursWorked())}</span>.
+                </p>
+                <p>Was this overtime or did you forget to clock out?</p>
+                <div className="flex flex-col gap-2 pt-2">
+                  <Button
+                    variant={lateClockOutMode === "overtime" ? "default" : "outline"}
+                    className="justify-start"
+                    onClick={() => setLateClockOutMode("overtime")}
+                  >
+                    <Timer className="mr-2 h-4 w-4" />
+                    It was overtime — use current time
+                  </Button>
+                  <Button
+                    variant={lateClockOutMode === "missed" ? "default" : "outline"}
+                    className="justify-start"
+                    onClick={() => setLateClockOutMode("missed")}
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    I forgot to clock out — enter actual time
+                  </Button>
+                </div>
+                {lateClockOutMode === "missed" && (
+                  <div className="space-y-2 pt-2">
+                    <Label htmlFor="missed-time">Actual clock-out time</Label>
+                    <Input
+                      id="missed-time"
+                      type="time"
+                      value={missedClockOutTime}
+                      onChange={(e) => setMissedClockOutTime(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setLateClockOutMode(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleLateClockOutConfirm}
+              disabled={!lateClockOutMode || (lateClockOutMode === "missed" && !missedClockOutTime)}
+            >
+              Confirm Clock Out
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -51,10 +51,10 @@ const LEAVE_COLORS = [
 ];
 
 const reportCards = [
-  { title: "Employee Report", description: "Full employee directory with details", icon: <Users className="h-5 w-5" /> },
-  { title: "Leave Summary", description: "Leave balance and usage report", icon: <Calendar className="h-5 w-5" /> },
-  { title: "Payroll Report", description: "Monthly payroll breakdown", icon: <CreditCard className="h-5 w-5" /> },
-  { title: "Asset Report", description: "Asset inventory and assignments", icon: <FileText className="h-5 w-5" /> },
+  { title: "Attendance Report", description: "Monthly attendance tracking", icon: <Users className="h-5 w-5" />, sectionId: "report-attendance" },
+  { title: "Leave Summary", description: "Leave balance and usage report", icon: <Calendar className="h-5 w-5" />, sectionId: "report-leave" },
+  { title: "Payroll Report", description: "Monthly payroll breakdown", icon: <CreditCard className="h-5 w-5" />, sectionId: "report-payroll" },
+  { title: "Asset Report", description: "Asset inventory and assignments", icon: <FileText className="h-5 w-5" />, sectionId: "report-asset" },
 ];
 
 const Reports = () => {
@@ -119,13 +119,16 @@ const Reports = () => {
         {/* Quick Reports */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {reportCards.map((report) => (
-            <Card key={report.title} className="cursor-pointer transition-all hover:shadow-lg">
+            <Card
+              key={report.title}
+              className="cursor-pointer transition-all hover:shadow-lg"
+              onClick={() => {
+                document.getElementById(report.sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="rounded-xl bg-primary/10 p-3 text-primary">{report.icon}</div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Download className="h-4 w-4" />
-                  </Button>
                 </div>
                 <div className="mt-4">
                   <p className="font-semibold text-foreground">{report.title}</p>
@@ -421,16 +424,24 @@ const Reports = () => {
         </div>
 
         {/* Payroll Summary Report */}
-        <PayrollSummaryReport />
+        <div id="report-payroll">
+          <PayrollSummaryReport />
+        </div>
 
         {/* Leave Balance Report */}
-        <LeaveBalanceReport />
+        <div id="report-leave">
+          <LeaveBalanceReport />
+        </div>
 
         {/* Asset Inventory Report */}
-        <AssetInventoryReport />
+        <div id="report-asset">
+          <AssetInventoryReport />
+        </div>
 
         {/* Attendance Report */}
-        <AttendanceReport />
+        <div id="report-attendance">
+          <AttendanceReport />
+        </div>
       </div>
     </DashboardLayout>
   );
