@@ -10,10 +10,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Star, FileText, Loader2, Plus, Users, CheckCircle, Edit2, Target, ListChecks } from "lucide-react";
+import { Star, FileText, Loader2, Plus, Users, CheckCircle, Edit2, Target, ListChecks, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCreateReview, useUpdateReview } from "@/hooks/usePerformance";
+import { useCreateReview, useUpdateReview, useDeleteReview } from "@/hooks/usePerformance";
 import { RatingStars } from "./RatingStars";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -85,6 +85,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
   const queryClient = useQueryClient();
   const createReviewMutation = useCreateReview();
   const updateReviewMutation = useUpdateReview();
+  const deleteReviewMutation = useDeleteReview();
 
   const { data: teamMembers, isLoading: teamLoading } = useQuery({
     queryKey: ["team-members-for-review", managerId],
@@ -177,7 +178,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
   });
 
   const isLoading = teamLoading || reviewsLoading;
-  const isPending = createReviewMutation.isPending || updateReviewMutation.isPending || saveKpiRatings.isPending;
+  const isPending = createReviewMutation.isPending || updateReviewMutation.isPending || saveKpiRatings.isPending || deleteReviewMutation.isPending;
 
   const resetForm = () => {
     setFormData({ review_period: "", overall_rating: 0, strengths: "", areas_for_improvement: "", comments: "" });
@@ -340,6 +341,12 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
     }
   };
 
+  const handleDeleteDraft = async (reviewId: string) => {
+    if (confirm("Are you sure you want to delete this draft review?")) {
+      await deleteReviewMutation.mutateAsync(reviewId);
+    }
+  };
+
   const renderStars = (rating: number, interactive = false, onChange?: (r: number) => void) => (
     <div className="flex items-center gap-1">
       {[1, 2, 3, 4, 5].map((star) => (
@@ -415,22 +422,23 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
             <div className="space-y-3">
               <h4 className="font-medium text-sm text-muted-foreground">Draft Reviews</h4>
               <div className="space-y-2">
-                {draftReviews.map(review => (
-                  <div key={review.id} className="flex items-center justify-between p-3 rounded-lg border border-dashed">
-                    <div>
-                      <p className="font-medium text-sm">{review.employee.first_name} {review.employee.last_name}</p>
-                      <p className="text-xs text-muted-foreground">{review.review_period} • {format(new Date(review.review_date), "MMM d, yyyy")}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {review.overall_rating && renderStars(review.overall_rating)}
-                      <Badge variant="outline" className={statusColors[review.status]}>{review.status}</Badge>
-                      <Button size="sm" variant="outline" onClick={() => loadRatingsForEdit(review)}><Edit2 className="h-4 w-4 mr-1" />Edit</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+               {draftReviews.map(review => (
+                   <div key={review.id} className="flex items-center justify-between p-3 rounded-lg border border-dashed">
+                     <div>
+                       <p className="font-medium text-sm">{review.employee.first_name} {review.employee.last_name}</p>
+                       <p className="text-xs text-muted-foreground">{review.review_period} • {format(new Date(review.review_date), "MMM d, yyyy")}</p>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       {review.overall_rating && renderStars(review.overall_rating)}
+                       <Badge variant="outline" className={statusColors[review.status]}>{review.status}</Badge>
+                       <Button size="sm" variant="outline" onClick={() => loadRatingsForEdit(review)}><Edit2 className="h-4 w-4 mr-1" />Edit</Button>
+                       <Button size="sm" variant="outline" onClick={() => handleDeleteDraft(review.id)} disabled={isPending}><Trash2 className="h-4 w-4 mr-1" />Delete</Button>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             </div>
+           )}
 
           {otherReviews.length > 0 && (
             <div className="space-y-3">
