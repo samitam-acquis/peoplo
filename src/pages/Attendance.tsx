@@ -689,18 +689,9 @@ const Attendance = () => {
                 </CardDescription>
               </div>
             </div>
-            <DateRangeExportDialog
-              title="Export Attendance Report"
-              description={`Export attendance report for ${MONTHS[parseInt(selectedMonth)].label} ${selectedYear}. Use date filters for custom range or leave empty to export the selected month.`}
-              onExportCSV={exportToCSV}
-              onExportPDF={exportToPDF}
-              disabled={reportLoading || !filteredReportData?.length}
-            />
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4">
+            <div className="flex items-center gap-2">
               <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Filter by department" />
                 </SelectTrigger>
                 <SelectContent>
@@ -712,7 +703,16 @@ const Attendance = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <DateRangeExportDialog
+                title="Export Attendance Report"
+                description={`Export attendance report for ${MONTHS[parseInt(selectedMonth)].label} ${selectedYear}. Use date filters for custom range or leave empty to export the selected month.`}
+                onExportCSV={exportToCSV}
+                onExportPDF={exportToPDF}
+                disabled={reportLoading || !filteredReportData?.length}
+              />
             </div>
+          </CardHeader>
+          <CardContent>
             {reportLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : filteredReportData && filteredReportData.length > 0 ? (
