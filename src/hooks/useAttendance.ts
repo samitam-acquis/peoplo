@@ -171,7 +171,7 @@ export function useAttendanceReport(month: Date) {
         .from("attendance_records")
         .select(`
           *,
-          employee:employees(first_name, last_name, employee_code, department:departments(name))
+          employee:employees(first_name, last_name, employee_code, department:departments!employees_department_id_fkey(name))
         `)
         .gte("date", start)
         .lte("date", end)

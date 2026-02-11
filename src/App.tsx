@@ -32,6 +32,7 @@ import CompanyCalendar from "./pages/CompanyCalendar";
 import NotificationPreferences from "./pages/NotificationPreferences";
 import Changelog from "./pages/Changelog";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/security" element={<Security />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             
             {/* Protected app pages */}
             <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />

@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -97,7 +97,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     });
-    return { error: error as Error | null };
+
+    if (error) {
+      return { error: error as Error };
+    }
+
+    // Supabase returns a fake user with empty identities for duplicate signups
+    if (data?.user?.identities && data.user.identities.length === 0) {
+      return { error: new Error("User already registered") };
+    }
+
+    return { error: null };
   };
 
   const signOut = async () => {
