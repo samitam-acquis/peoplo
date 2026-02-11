@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Target, Loader2, Calendar, Users, Plus, Trash2, Edit2 } from "lucide-react";
+import { Target, Loader2, Calendar, Users, Plus, Trash2, Edit2, Info } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCreateGoal, useUpdateGoal, useDeleteGoal } from "@/hooks/usePerformance";
@@ -43,6 +43,7 @@ interface TeamMemberWithGoals {
   last_name: string;
   designation: string;
   avatar_url: string | null;
+  hasActiveReview: boolean;
   goals: {
     id: string;
     title: string;
@@ -100,17 +101,34 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
       if (empError) throw empError;
       if (!employees || employees.length === 0) return [];
 
-      const { data: goals, error: goalsError } = await supabase
-        .from("goals")
-        .select("*")
-        .in("employee_id", employees.map(e => e.id))
-        .order("created_at", { ascending: false });
+      const employeeIds = employees.map(e => e.id);
 
-      if (goalsError) throw goalsError;
+      // Fetch goals and active reviews in parallel
+      const [goalsResult, reviewsResult] = await Promise.all([
+        supabase
+          .from("goals")
+          .select("*")
+          .in("employee_id", employeeIds)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("performance_reviews")
+          .select("employee_id, status")
+          .in("employee_id", employeeIds)
+          .in("status", ["draft", "published", "final"]),
+      ]);
+
+      if (goalsResult.error) throw goalsResult.error;
+      if (reviewsResult.error) throw reviewsResult.error;
+
+      // Build set of employees with active reviews
+      const employeesWithActiveReview = new Set(
+        (reviewsResult.data || []).map(r => r.employee_id)
+      );
 
       const result: TeamMemberWithGoals[] = employees.map(emp => ({
         ...emp,
-        goals: (goals || []).filter(g => g.employee_id === emp.id),
+        hasActiveReview: employeesWithActiveReview.has(emp.id),
+        goals: (goalsResult.data || []).filter(g => g.employee_id === emp.id),
       }));
 
       return result;
@@ -296,83 +314,120 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
                   <p className="font-medium">{employee.first_name} {employee.last_name}</p>
                   <p className="text-xs text-muted-foreground">{employee.designation}</p>
                 </div>
-                <Badge variant="outline" className="ml-auto">
-                  {employee.goals.length} KPIs
-                </Badge>
+                <div className="ml-auto flex items-center gap-2">
+                  {employee.hasActiveReview ? (
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs">
+                      Review Active
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs">
+                      No Active Review
+                    </Badge>
+                  )}
+                  <Badge variant="outline">
+                    {employee.goals.length} KPIs
+                  </Badge>
+                </div>
               </div>
 
               {employee.goals.length > 0 ? (
                 <div className="space-y-3 pl-11">
-                  {employee.goals.map(goal => (
-                    <div key={goal.id} className="rounded-lg border p-3 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="space-y-1 flex-1">
-                          <h4 className="font-medium text-sm">{goal.title}</h4>
-                          {goal.description && (
-                            <p className="text-xs text-muted-foreground line-clamp-2">
-                              {goal.description}
-                            </p>
+                  {!employee.hasActiveReview && (
+                    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-2 text-xs text-muted-foreground">
+                      <Info className="h-3.5 w-3.5 shrink-0" />
+                      <span>Create a performance review for this employee to enable KPI ratings.</span>
+                    </div>
+                  )}
+                  {employee.goals.map(goal => {
+                    const canManagerRate = employee.hasActiveReview && goal.employee_rating !== null;
+
+                    return (
+                      <div key={goal.id} className="rounded-lg border p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1 flex-1">
+                            <h4 className="font-medium text-sm">{goal.title}</h4>
+                            {goal.description && (
+                              <p className="text-xs text-muted-foreground line-clamp-2">
+                                {goal.description}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditGoalDialog(goal, employee.id)}>
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete KPI</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete "{goal.title}"? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteGoal(goal.id, employee.id)}>
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5">
+                          <Badge variant="outline" className={`text-xs ${statusColors[goal.status]}`}>
+                            {goal.status.replace("_", " ")}
+                          </Badge>
+                          <Badge variant="outline" className={`text-xs ${priorityColors[goal.priority]}`}>
+                            {goal.priority}
+                          </Badge>
+                          {goal.due_date && (
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {format(new Date(goal.due_date), "MMM d")}
+                            </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditGoalDialog(goal, employee.id)}>
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete KPI</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete "{goal.title}"? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteGoal(goal.id, employee.id)}>
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+
+                        <div className="space-y-1.5 pt-1">
+                          <RatingStars
+                            label="Employee"
+                            value={goal.employee_rating}
+                            readonly
+                            size="sm"
+                          />
+                          {canManagerRate ? (
+                            <RatingStars
+                              label="Manager"
+                              value={goal.manager_rating}
+                              onChange={(rating) => handleManagerRating(goal.id, employee.id, rating)}
+                              size="sm"
+                            />
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <RatingStars
+                                label="Manager"
+                                value={goal.manager_rating}
+                                readonly
+                                size="sm"
+                              />
+                              {employee.hasActiveReview && goal.employee_rating === null && (
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  (awaiting employee rating)
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        <Badge variant="outline" className={`text-xs ${statusColors[goal.status]}`}>
-                          {goal.status.replace("_", " ")}
-                        </Badge>
-                        <Badge variant="outline" className={`text-xs ${priorityColors[goal.priority]}`}>
-                          {goal.priority}
-                        </Badge>
-                        {goal.due_date && (
-                          <Badge variant="outline" className="text-xs gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {format(new Date(goal.due_date), "MMM d")}
-                          </Badge>
-                        )}
-                      </div>
-
-                      <div className="space-y-1.5 pt-1">
-                        <RatingStars
-                          label="Employee"
-                          value={goal.employee_rating}
-                          readonly
-                          size="sm"
-                        />
-                        <RatingStars
-                          label="Manager"
-                          value={goal.manager_rating}
-                          onChange={(rating) => handleManagerRating(goal.id, employee.id, rating)}
-                          size="sm"
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="pl-11 flex items-center gap-2">

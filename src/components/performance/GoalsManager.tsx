@@ -24,8 +24,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Target, Plus, Loader2, Trash2, Edit2, Calendar } from "lucide-react";
-import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal, Goal } from "@/hooks/usePerformance";
+import { Target, Plus, Loader2, Trash2, Edit2, Calendar, Info } from "lucide-react";
+import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal, Goal, usePerformanceReviews } from "@/hooks/usePerformance";
 import { RatingStars } from "./RatingStars";
 import { format } from "date-fns";
 
@@ -59,9 +59,16 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
   });
 
   const { data: goals, isLoading } = useGoals(employeeId);
+  const { data: reviews } = usePerformanceReviews(employeeId);
   const createMutation = useCreateGoal();
   const updateMutation = useUpdateGoal();
   const deleteMutation = useDeleteGoal();
+
+  // Check if there's an active review cycle (draft or published, not acknowledged)
+  const activeReview = reviews?.find(
+    (r) => r.status === "draft" || r.status === "published" || r.status === "final"
+  );
+  const hasActiveReview = !!activeReview;
 
   const resetForm = () => {
     setFormData({
@@ -132,7 +139,7 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
       id: goal.id,
       employeeId,
       employee_rating: rating,
-      status: "in_progress",
+      status: goal.status === "not_started" ? "in_progress" : goal.status,
     });
   };
 
@@ -163,6 +170,13 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
           </Button>
         </CardHeader>
         <CardContent>
+          {!hasActiveReview && goals && goals.length > 0 && (
+            <div className="flex items-center gap-2 mb-4 rounded-md border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+              <Info className="h-4 w-4 shrink-0" />
+              <span>Ratings can only be added during an active review cycle initiated by your manager.</span>
+            </div>
+          )}
+
           {goals && goals.length > 0 ? (
             <div className="space-y-4">
               {goals.map((goal) => (
@@ -220,22 +234,19 @@ export function GoalsManager({ employeeId }: GoalsManagerProps) {
                   </div>
 
                   <div className="space-y-2 pt-1">
-                    <div className="flex items-center justify-between">
-                      <RatingStars
-                        label="My Rating"
-                        value={goal.employee_rating}
-                        onChange={(rating) => handleEmployeeRating(goal, rating)}
-                        size="sm"
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <RatingStars
-                        label="Manager"
-                        value={goal.manager_rating}
-                        readonly
-                        size="sm"
-                      />
-                    </div>
+                    <RatingStars
+                      label="My Rating"
+                      value={goal.employee_rating}
+                      onChange={hasActiveReview ? (rating) => handleEmployeeRating(goal, rating) : undefined}
+                      readonly={!hasActiveReview}
+                      size="sm"
+                    />
+                    <RatingStars
+                      label="Manager"
+                      value={goal.manager_rating}
+                      readonly
+                      size="sm"
+                    />
                   </div>
                 </div>
               ))}
