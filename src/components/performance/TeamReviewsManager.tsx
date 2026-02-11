@@ -490,7 +490,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
             <Button variant="secondary" onClick={() => handleSubmit("draft")} disabled={isPending}>
               {editingReview ? "Save Draft" : "Save as Draft"}
             </Button>
-            <Button onClick={() => handleSubmit("submitted")} disabled={isPending}>
+            <Button onClick={() => handleSubmit("submitted")} disabled={isPending || formData.overall_rating === 0}>
               {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Submit Review
             </Button>
