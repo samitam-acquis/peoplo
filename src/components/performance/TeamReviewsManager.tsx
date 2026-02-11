@@ -344,6 +344,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
   const handleDeleteDraft = async (reviewId: string) => {
     if (confirm("Are you sure you want to delete this draft review?")) {
       await deleteReviewMutation.mutateAsync(reviewId);
+      queryClient.invalidateQueries({ queryKey: ["team-reviews-by-manager", managerId] });
     }
   };
 
