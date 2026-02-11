@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { PerformanceWidget } from "@/components/dashboard/PerformanceWidget";
+
 import { PendingApprovalsWidget } from "@/components/dashboard/PendingApprovalsWidget";
 import { TeamLeaveCalendar } from "@/components/dashboard/TeamLeaveCalendar";
 import { NonEmployeeDashboard } from "@/components/dashboard/NonEmployeeDashboard";
@@ -180,7 +180,6 @@ const Index = () => {
             <PendingApprovalsWidget />
             <TeamLeaveCalendar />
             <QuickActions />
-            <PerformanceWidget />
           </div>
         </div>
       </div>
