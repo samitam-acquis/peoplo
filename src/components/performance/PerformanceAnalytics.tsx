@@ -45,7 +45,7 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
   const [startDate, setStartDate] = useState<Date | undefined>(subMonths(new Date(), 6));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
 
-  // Fetch goals for trend analysis
+  // Fetch KPIs for trend analysis
   const { data: goals, isLoading: goalsLoading } = useQuery({
     queryKey: ["goals-analytics", employeeId],
     queryFn: async () => {
@@ -165,14 +165,14 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
       ).toFixed(1)
     : "N/A";
 
-  const hasGoalData = filteredGoals.length > 0;
+  const hasKPIData = filteredGoals.length > 0;
   const hasReviewData = filteredReviews.length > 0;
 
   // Export to CSV
   const exportToCSV = () => {
     const dateRange = `${startDate ? format(startDate, "yyyy-MM-dd") : "all"}_to_${endDate ? format(endDate, "yyyy-MM-dd") : "all"}`;
     
-    // Goals CSV
+    // KPIs CSV
     let csvContent = "Performance Analytics Report\n";
     csvContent += `Date Range: ${startDate ? format(startDate, "PPP") : "All"} to ${endDate ? format(endDate, "PPP") : "All"}\n\n`;
     
@@ -391,7 +391,7 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
             <CardTitle className="text-base">KPI Status Distribution</CardTitle>
           </CardHeader>
           <CardContent>
-            {hasGoalData ? (
+            {hasKPIData ? (
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie
