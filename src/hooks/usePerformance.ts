@@ -14,6 +14,8 @@ export interface Goal {
   due_date: string | null;
   completed_at: string | null;
   created_at: string;
+  employee_rating: number | null;
+  manager_rating: number | null;
 }
 
 export interface PerformanceReview {
@@ -257,49 +259,73 @@ export function useUpdateReview() {
 }
 
 export function useAcknowledgeReview() {
-  const queryClient = useQueryClient();
+   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async ({ 
-      reviewId, 
-      userId, 
-      employeeName, 
-      reviewPeriod 
-    }: { 
-      reviewId: string; 
-      userId: string; 
-      employeeName: string; 
-      reviewPeriod: string;
-    }) => {
-      const { error } = await supabase
-        .from("performance_reviews")
-        .update({
-          acknowledged_at: new Date().toISOString(),
-          acknowledged_by: userId,
-          status: "acknowledged",
-        })
-        .eq("id", reviewId);
+   return useMutation({
+     mutationFn: async ({ 
+       reviewId, 
+       userId, 
+       employeeName, 
+       reviewPeriod 
+     }: { 
+       reviewId: string; 
+       userId: string; 
+       employeeName: string; 
+       reviewPeriod: string;
+     }) => {
+       const { error } = await supabase
+         .from("performance_reviews")
+         .update({
+           acknowledged_at: new Date().toISOString(),
+           acknowledged_by: userId,
+           status: "acknowledged",
+         })
+         .eq("id", reviewId);
 
-      if (error) throw error;
+       if (error) throw error;
 
-      // Send notification to reviewer (fire and forget)
-      supabase.functions.invoke("review-acknowledgment-notification", {
-        body: {
-          review_id: reviewId,
-          employee_name: employeeName,
-          review_period: reviewPeriod,
-        }
-      }).catch(err => {
-        console.error("Failed to send acknowledgment notification:", err);
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["performance-reviews"] });
-      queryClient.invalidateQueries({ queryKey: ["all-performance-reviews"] });
-      toast.success("Review acknowledged");
-    },
-    onError: (error) => {
-      toast.error("Failed to acknowledge review: " + error.message);
-    },
-  });
+       // Send notification to reviewer (fire and forget)
+       supabase.functions.invoke("review-acknowledgment-notification", {
+         body: {
+           review_id: reviewId,
+           employee_name: employeeName,
+           review_period: reviewPeriod,
+         }
+       }).catch(err => {
+         console.error("Failed to send acknowledgment notification:", err);
+       });
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["performance-reviews"] });
+       queryClient.invalidateQueries({ queryKey: ["all-performance-reviews"] });
+       toast.success("Review acknowledged");
+     },
+     onError: (error) => {
+       toast.error("Failed to acknowledge review: " + error.message);
+     },
+   });
+}
+
+export function useDeleteReview() {
+   const queryClient = useQueryClient();
+
+   return useMutation({
+     mutationFn: async (reviewId: string) => {
+       const { error } = await supabase
+         .from("performance_reviews")
+         .delete()
+         .eq("id", reviewId);
+
+       if (error) throw error;
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["performance-reviews"] });
+       queryClient.invalidateQueries({ queryKey: ["all-performance-reviews"] });
+       queryClient.invalidateQueries({ queryKey: ["team-reviews-by-manager"] });
+       toast.success("Review deleted");
+     },
+     onError: (error) => {
+       toast.error("Failed to delete review: " + error.message);
+     },
+   });
 }

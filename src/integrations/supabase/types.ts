@@ -421,8 +421,10 @@ export type Database = {
           description: string | null
           due_date: string | null
           employee_id: string
+          employee_rating: number | null
           id: string
           last_reminder_sent: string | null
+          manager_rating: number | null
           priority: string | null
           progress: number | null
           status: string
@@ -436,8 +438,10 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           employee_id: string
+          employee_rating?: number | null
           id?: string
           last_reminder_sent?: string | null
+          manager_rating?: number | null
           priority?: string | null
           progress?: number | null
           status?: string
@@ -451,8 +455,10 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           employee_id?: string
+          employee_rating?: number | null
           id?: string
           last_reminder_sent?: string | null
+          manager_rating?: number | null
           priority?: string | null
           progress?: number | null
           status?: string
@@ -897,6 +903,51 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      review_kpi_ratings: {
+        Row: {
+          created_at: string
+          employee_rating: number | null
+          goal_id: string
+          id: string
+          manager_rating: number | null
+          review_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_rating?: number | null
+          goal_id: string
+          id?: string
+          manager_rating?: number | null
+          review_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_rating?: number | null
+          goal_id?: string
+          id?: string
+          manager_rating?: number | null
+          review_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_kpi_ratings_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_kpi_ratings_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "performance_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       salary_history: {
         Row: {

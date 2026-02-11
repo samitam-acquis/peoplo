@@ -61,7 +61,7 @@ const Performance = () => {
         <div className="space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-foreground">Performance</h2>
-            <p className="text-muted-foreground">Track goals and view performance reviews</p>
+            <p className="text-muted-foreground">Track KPIs and view performance reviews</p>
           </div>
           <Card>
             <CardContent className="py-12 text-center">
@@ -86,17 +86,17 @@ const Performance = () => {
           <h2 className="text-2xl font-bold text-foreground">Performance</h2>
           <p className="text-muted-foreground">
             {employeeData.isManager 
-              ? "Track your goals, view reviews, and manage your team's performance"
-              : "Track your goals and view performance reviews"
+              ? "Track your KPIs, view reviews, and manage your team's performance"
+              : "Track your KPIs and view performance reviews"
             }
           </p>
         </div>
 
-        <Tabs defaultValue="goals" className="space-y-4">
+        <Tabs defaultValue="kpis" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="goals" className="gap-2">
+            <TabsTrigger value="kpis" className="gap-2">
               <Target className="h-4 w-4" />
-              Goals
+              KPIs
             </TabsTrigger>
             <TabsTrigger value="reviews" className="gap-2">
               <FileText className="h-4 w-4" />
@@ -114,7 +114,7 @@ const Performance = () => {
             )}
           </TabsList>
 
-          <TabsContent value="goals">
+          <TabsContent value="kpis">
             <GoalsManager employeeId={employeeData.id} />
           </TabsContent>
 
