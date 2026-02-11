@@ -8,30 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Target, Loader2, Calendar, Users, Plus, Trash2, Edit2, Info } from "lucide-react";
+import { Target, Loader2, Calendar, Users, Plus, Trash2, Edit2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCreateGoal, useUpdateGoal, useDeleteGoal } from "@/hooks/usePerformance";
-import { RatingStars } from "./RatingStars";
 import { format } from "date-fns";
-import { toast } from "sonner";
 
 interface TeamGoalsViewProps {
   managerId: string;
@@ -43,7 +30,6 @@ interface TeamMemberWithGoals {
   last_name: string;
   designation: string;
   avatar_url: string | null;
-  hasActiveReview: boolean;
   goals: {
     id: string;
     title: string;
@@ -51,10 +37,7 @@ interface TeamMemberWithGoals {
     category: string;
     priority: string;
     status: string;
-    progress: number;
     due_date: string | null;
-    employee_rating: number | null;
-    manager_rating: number | null;
   }[];
 }
 
@@ -76,13 +59,7 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
   const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
   const [editingGoalData, setEditingGoalData] = useState<{ id: string; employeeId: string } | null>(null);
   const [goalForm, setGoalForm] = useState({
-    employee_id: "",
-    title: "",
-    description: "",
-    category: "performance",
-    customCategory: "",
-    priority: "medium",
-    due_date: "",
+    employee_id: "", title: "", description: "", category: "performance", customCategory: "", priority: "medium", due_date: "",
   });
   const queryClient = useQueryClient();
   const createGoalMutation = useCreateGoal();
@@ -101,114 +78,60 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
       if (empError) throw empError;
       if (!employees || employees.length === 0) return [];
 
-      const employeeIds = employees.map(e => e.id);
+      const { data: goals, error: goalsError } = await supabase
+        .from("goals")
+        .select("id, title, description, category, priority, status, due_date, employee_id")
+        .in("employee_id", employees.map(e => e.id))
+        .order("created_at", { ascending: false });
 
-      // Fetch goals and active reviews in parallel
-      const [goalsResult, reviewsResult] = await Promise.all([
-        supabase
-          .from("goals")
-          .select("*")
-          .in("employee_id", employeeIds)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("performance_reviews")
-          .select("employee_id, status")
-          .in("employee_id", employeeIds)
-          .in("status", ["draft", "published", "final"]),
-      ]);
+      if (goalsError) throw goalsError;
 
-      if (goalsResult.error) throw goalsResult.error;
-      if (reviewsResult.error) throw reviewsResult.error;
-
-      // Build set of employees with active reviews
-      const employeesWithActiveReview = new Set(
-        (reviewsResult.data || []).map(r => r.employee_id)
-      );
-
-      const result: TeamMemberWithGoals[] = employees.map(emp => ({
+      return employees.map(emp => ({
         ...emp,
-        hasActiveReview: employeesWithActiveReview.has(emp.id),
-        goals: (goalsResult.data || []).filter(g => g.employee_id === emp.id),
-      }));
-
-      return result;
+        goals: (goals || []).filter(g => g.employee_id === emp.id),
+      })) as TeamMemberWithGoals[];
     },
     enabled: !!managerId,
   });
 
-  const handleManagerRating = (goalId: string, employeeId: string, rating: number) => {
-    updateGoalMutation.mutate(
-      { id: goalId, employeeId, manager_rating: rating },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ["team-goals", managerId] });
-          toast.success("Manager rating updated");
-        },
-      }
-    );
-  };
-
   const resetGoalForm = () => {
-    setGoalForm({
-      employee_id: "",
-      title: "",
-      description: "",
-      category: "performance",
-      customCategory: "",
-      priority: "medium",
-      due_date: "",
-    });
+    setGoalForm({ employee_id: "", title: "", description: "", category: "performance", customCategory: "", priority: "medium", due_date: "" });
     setEditingGoalData(null);
   };
 
   const openAddGoalDialog = (employeeId?: string) => {
     resetGoalForm();
-    if (employeeId) {
-      setGoalForm(prev => ({ ...prev, employee_id: employeeId }));
-    }
+    if (employeeId) setGoalForm(prev => ({ ...prev, employee_id: employeeId }));
     setIsGoalDialogOpen(true);
   };
 
   const openEditGoalDialog = (goal: TeamMemberWithGoals["goals"][0], employeeId: string) => {
-    const predefinedCategories = ["performance", "productivity", "quality", "leadership", "development"];
-    const isCustom = goal.category && !predefinedCategories.includes(goal.category);
+    const predefined = ["performance", "productivity", "quality", "leadership", "development"];
+    const isCustom = goal.category && !predefined.includes(goal.category);
     setEditingGoalData({ id: goal.id, employeeId });
     setGoalForm({
-      employee_id: employeeId,
-      title: goal.title,
-      description: goal.description || "",
-      category: isCustom ? "other" : goal.category,
-      customCategory: isCustom ? goal.category : "",
-      priority: goal.priority,
-      due_date: goal.due_date || "",
+      employee_id: employeeId, title: goal.title, description: goal.description || "",
+      category: isCustom ? "other" : goal.category, customCategory: isCustom ? goal.category : "",
+      priority: goal.priority, due_date: goal.due_date || "",
     });
     setIsGoalDialogOpen(true);
   };
 
   const handleGoalSubmit = async () => {
     if (!goalForm.title.trim() || !goalForm.employee_id) return;
-    const finalCategory = goalForm.category === "other"
-      ? goalForm.customCategory.trim() || "other"
-      : goalForm.category;
+    const finalCategory = goalForm.category === "other" ? goalForm.customCategory.trim() || "other" : goalForm.category;
 
     if (editingGoalData) {
       await updateGoalMutation.mutateAsync({
-        id: editingGoalData.id,
-        employeeId: editingGoalData.employeeId,
-        title: goalForm.title,
-        description: goalForm.description || null,
-        category: finalCategory,
-        priority: goalForm.priority,
-        due_date: goalForm.due_date || null,
+        id: editingGoalData.id, employeeId: editingGoalData.employeeId,
+        title: goalForm.title, description: goalForm.description || null,
+        category: finalCategory, priority: goalForm.priority, due_date: goalForm.due_date || null,
       });
     } else {
       await createGoalMutation.mutateAsync({
-        employee_id: goalForm.employee_id,
-        title: goalForm.title,
-        description: goalForm.description || undefined,
-        category: finalCategory,
-        priority: goalForm.priority,
-        due_date: goalForm.due_date || undefined,
+        employee_id: goalForm.employee_id, title: goalForm.title,
+        description: goalForm.description || undefined, category: finalCategory,
+        priority: goalForm.priority, due_date: goalForm.due_date || undefined,
       });
     }
     queryClient.invalidateQueries({ queryKey: ["team-goals", managerId] });
@@ -217,331 +140,154 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
   };
 
   const handleDeleteGoal = (goalId: string, employeeId: string) => {
-    deleteGoalMutation.mutate(
-      { id: goalId, employeeId },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ["team-goals", managerId] });
-        },
-      }
-    );
+    deleteGoalMutation.mutate({ id: goalId, employeeId }, {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["team-goals", managerId] }),
+    });
   };
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    );
+    return <Card><CardContent className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></CardContent></Card>;
   }
 
   if (!teamData || teamData.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            Team KPIs
-          </CardTitle>
-          <CardDescription>View and rate KPIs for your team members</CardDescription>
+          <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5" />Team KPIs</CardTitle>
+          <CardDescription>Manage KPIs for your team. Ratings are added during reviews.</CardDescription>
         </CardHeader>
         <CardContent className="text-center py-8 text-muted-foreground">
-          <Users className="mx-auto h-8 w-8 mb-2 opacity-50" />
-          <p>No team members found</p>
-          <p className="text-sm">You don't have any direct reports</p>
+          <Users className="mx-auto h-8 w-8 mb-2 opacity-50" /><p>No team members found</p>
         </CardContent>
       </Card>
     );
   }
 
-  const filteredData = selectedEmployee === "all" 
-    ? teamData 
-    : teamData.filter(emp => emp.id === selectedEmployee);
-
+  const filteredData = selectedEmployee === "all" ? teamData : teamData.filter(emp => emp.id === selectedEmployee);
   const totalKPIs = teamData.reduce((sum, emp) => sum + emp.goals.length, 0);
-  const ratedKPIs = teamData.reduce(
-    (sum, emp) => sum + emp.goals.filter(g => g.manager_rating !== null).length, 
-    0
-  );
 
   return (
     <>
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
-        <div>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            Team KPIs
-          </CardTitle>
-          <CardDescription>
-            {totalKPIs} total KPIs • {ratedKPIs} rated
-          </CardDescription>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filter by employee" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Team Members</SelectItem>
-              {teamData.map(emp => (
-                <SelectItem key={emp.id} value={emp.id}>
-                  {emp.first_name} {emp.last_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={() => openAddGoalDialog()}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add KPI
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          {filteredData.map(employee => (
-            <div key={employee.id} className="space-y-3">
-              <div className="flex items-center gap-3 pb-2 border-b">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={employee.avatar_url || undefined} />
-                  <AvatarFallback>
-                    {employee.first_name[0]}{employee.last_name[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-                  <p className="text-xs text-muted-foreground">{employee.designation}</p>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5" />Team KPIs</CardTitle>
+            <CardDescription>{totalKPIs} total KPIs • Ratings are added during reviews</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+              <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filter by employee" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Team Members</SelectItem>
+                {teamData.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => openAddGoalDialog()}><Plus className="h-4 w-4 mr-2" />Add KPI</Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {filteredData.map(employee => (
+              <div key={employee.id} className="space-y-3">
+                <div className="flex items-center gap-3 pb-2 border-b">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={employee.avatar_url || undefined} />
+                    <AvatarFallback>{employee.first_name[0]}{employee.last_name[0]}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{employee.first_name} {employee.last_name}</p>
+                    <p className="text-xs text-muted-foreground">{employee.designation}</p>
+                  </div>
+                  <Badge variant="outline" className="ml-auto">{employee.goals.length} KPIs</Badge>
                 </div>
-                <div className="ml-auto flex items-center gap-2">
-                  {employee.hasActiveReview ? (
-                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs">
-                      Review Active
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-xs">
-                      No Active Review
-                    </Badge>
-                  )}
-                  <Badge variant="outline">
-                    {employee.goals.length} KPIs
-                  </Badge>
-                </div>
-              </div>
 
-              {employee.goals.length > 0 ? (
-                <div className="space-y-3 pl-11">
-                  {!employee.hasActiveReview && (
-                    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-2 text-xs text-muted-foreground">
-                      <Info className="h-3.5 w-3.5 shrink-0" />
-                      <span>Create a performance review for this employee to enable KPI ratings.</span>
-                    </div>
-                  )}
-                  {employee.goals.map(goal => {
-                    const canManagerRate = employee.hasActiveReview && goal.employee_rating !== null;
-
-                    return (
+                {employee.goals.length > 0 ? (
+                  <div className="space-y-3 pl-11">
+                    {employee.goals.map(goal => (
                       <div key={goal.id} className="rounded-lg border p-3 space-y-2">
                         <div className="flex items-start justify-between gap-2">
                           <div className="space-y-1 flex-1">
                             <h4 className="font-medium text-sm">{goal.title}</h4>
-                            {goal.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-2">
-                                {goal.description}
-                              </p>
-                            )}
+                            {goal.description && <p className="text-xs text-muted-foreground line-clamp-2">{goal.description}</p>}
                           </div>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditGoalDialog(goal, employee.id)}>
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditGoalDialog(goal, employee.id)}><Edit2 className="h-3.5 w-3.5" /></Button>
                             <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7">
-                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                </Button>
-                              </AlertDialogTrigger>
+                              <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></AlertDialogTrigger>
                               <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete KPI</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete "{goal.title}"? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteGoal(goal.id, employee.id)}>
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
+                                <AlertDialogHeader><AlertDialogTitle>Delete KPI</AlertDialogTitle><AlertDialogDescription>Are you sure you want to delete "{goal.title}"?</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteGoal(goal.id, employee.id)}>Delete</AlertDialogAction></AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
                           </div>
                         </div>
-
                         <div className="flex flex-wrap gap-1.5">
-                          <Badge variant="outline" className={`text-xs ${statusColors[goal.status]}`}>
-                            {goal.status.replace("_", " ")}
-                          </Badge>
-                          <Badge variant="outline" className={`text-xs ${priorityColors[goal.priority]}`}>
-                            {goal.priority}
-                          </Badge>
-                          {goal.due_date && (
-                            <Badge variant="outline" className="text-xs gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {format(new Date(goal.due_date), "MMM d")}
-                            </Badge>
-                          )}
-                        </div>
-
-                        <div className="space-y-1.5 pt-1">
-                          <RatingStars
-                            label="Employee"
-                            value={goal.employee_rating}
-                            readonly
-                            size="sm"
-                          />
-                          {canManagerRate ? (
-                            <RatingStars
-                              label="Manager"
-                              value={goal.manager_rating}
-                              onChange={(rating) => handleManagerRating(goal.id, employee.id, rating)}
-                              size="sm"
-                            />
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <RatingStars
-                                label="Manager"
-                                value={goal.manager_rating}
-                                readonly
-                                size="sm"
-                              />
-                              {employee.hasActiveReview && goal.employee_rating === null && (
-                                <span className="text-xs text-muted-foreground ml-2">
-                                  (awaiting employee rating)
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          <Badge variant="outline" className={`text-xs ${statusColors[goal.status]}`}>{goal.status.replace("_", " ")}</Badge>
+                          <Badge variant="outline" className={`text-xs ${priorityColors[goal.priority]}`}>{goal.priority}</Badge>
+                          {goal.due_date && <Badge variant="outline" className="text-xs gap-1"><Calendar className="h-3 w-3" />{format(new Date(goal.due_date), "MMM d")}</Badge>}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="pl-11 flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground">No KPIs set</p>
-                  <Button variant="link" size="sm" className="text-xs" onClick={() => openAddGoalDialog(employee.id)}>
-                    <Plus className="h-3 w-3 mr-1" /> Add one
-                  </Button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="pl-11 flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground">No KPIs set</p>
+                    <Button variant="link" size="sm" className="text-xs" onClick={() => openAddGoalDialog(employee.id)}><Plus className="h-3 w-3 mr-1" /> Add one</Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-    {/* Add/Edit KPI Dialog */}
-    <Dialog open={isGoalDialogOpen} onOpenChange={setIsGoalDialogOpen}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{editingGoalData ? "Edit KPI" : "Add KPI for Team Member"}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          {!editingGoalData && (
-            <div className="space-y-2">
-              <Label>Team Member</Label>
-              <Select value={goalForm.employee_id} onValueChange={(v) => setGoalForm(prev => ({ ...prev, employee_id: v }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select team member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {teamData?.map(emp => (
-                    <SelectItem key={emp.id} value={emp.id}>
-                      {emp.first_name} {emp.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label>Title</Label>
-            <Input
-              value={goalForm.title}
-              onChange={(e) => setGoalForm(prev => ({ ...prev, title: e.target.value }))}
-              placeholder="Enter KPI title"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Description</Label>
-            <Textarea
-              value={goalForm.description}
-              onChange={(e) => setGoalForm(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Describe the KPI..."
-              rows={3}
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Select value={goalForm.category} onValueChange={(v) => setGoalForm(prev => ({ ...prev, category: v, customCategory: v === "other" ? prev.customCategory : "" }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="performance">Performance</SelectItem>
-                  <SelectItem value="productivity">Productivity</SelectItem>
-                  <SelectItem value="quality">Quality</SelectItem>
-                  <SelectItem value="leadership">Leadership</SelectItem>
-                  <SelectItem value="development">Development</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-              {goalForm.category === "other" && (
-                <Input
-                  value={goalForm.customCategory}
-                  onChange={(e) => setGoalForm(prev => ({ ...prev, customCategory: e.target.value }))}
-                  placeholder="Enter custom category"
-                  className="mt-2"
-                />
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Priority</Label>
-              <Select value={goalForm.priority} onValueChange={(v) => setGoalForm(prev => ({ ...prev, priority: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Due Date (Optional)</Label>
-            <Input
-              type="date"
-              value={goalForm.due_date}
-              onChange={(e) => setGoalForm(prev => ({ ...prev, due_date: e.target.value }))}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setIsGoalDialogOpen(false)}>Cancel</Button>
-          <Button
-            onClick={handleGoalSubmit}
-            disabled={!goalForm.title.trim() || !goalForm.employee_id || createGoalMutation.isPending || updateGoalMutation.isPending}
-          >
-            {(createGoalMutation.isPending || updateGoalMutation.isPending) && (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+      <Dialog open={isGoalDialogOpen} onOpenChange={setIsGoalDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editingGoalData ? "Edit KPI" : "Add KPI for Team Member"}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            {!editingGoalData && (
+              <div className="space-y-2">
+                <Label>Team Member</Label>
+                <Select value={goalForm.employee_id} onValueChange={(v) => setGoalForm(prev => ({ ...prev, employee_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select team member" /></SelectTrigger>
+                  <SelectContent>{teamData?.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
             )}
-            {editingGoalData ? "Save Changes" : "Add KPI"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <div className="space-y-2"><Label>Title</Label><Input value={goalForm.title} onChange={(e) => setGoalForm(prev => ({ ...prev, title: e.target.value }))} placeholder="Enter KPI title" /></div>
+            <div className="space-y-2"><Label>Description</Label><Textarea value={goalForm.description} onChange={(e) => setGoalForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Describe the KPI..." rows={3} /></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={goalForm.category} onValueChange={(v) => setGoalForm(prev => ({ ...prev, category: v, customCategory: v === "other" ? prev.customCategory : "" }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="performance">Performance</SelectItem><SelectItem value="productivity">Productivity</SelectItem>
+                    <SelectItem value="quality">Quality</SelectItem><SelectItem value="leadership">Leadership</SelectItem>
+                    <SelectItem value="development">Development</SelectItem><SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                {goalForm.category === "other" && <Input value={goalForm.customCategory} onChange={(e) => setGoalForm(prev => ({ ...prev, customCategory: e.target.value }))} placeholder="Enter custom category" className="mt-2" />}
+              </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select value={goalForm.priority} onValueChange={(v) => setGoalForm(prev => ({ ...prev, priority: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem></SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2"><Label>Due Date (Optional)</Label><Input type="date" value={goalForm.due_date} onChange={(e) => setGoalForm(prev => ({ ...prev, due_date: e.target.value }))} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsGoalDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleGoalSubmit} disabled={!goalForm.title.trim() || !goalForm.employee_id || createGoalMutation.isPending || updateGoalMutation.isPending}>
+              {(createGoalMutation.isPending || updateGoalMutation.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {editingGoalData ? "Save Changes" : "Add KPI"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
