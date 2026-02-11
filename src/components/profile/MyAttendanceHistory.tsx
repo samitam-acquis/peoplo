@@ -2,11 +2,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, MapPin, CalendarDays } from "lucide-react";
+import { Clock, MapPin, CalendarDays, Coffee } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { calculateTotalBreakHours, AttendanceBreak } from "@/hooks/useAttendanceBreaks";
 
 interface MyAttendanceHistoryProps {
   employeeId: string;
@@ -47,6 +48,26 @@ export function MyAttendanceHistory({ employeeId }: MyAttendanceHistoryProps) {
     },
     enabled: !!employeeId,
   });
+
+  // Fetch breaks for all records
+  const recordIds = records?.map(r => r.id) || [];
+  const { data: allBreaks } = useQuery({
+    queryKey: ["my-attendance-breaks", recordIds],
+    queryFn: async () => {
+      if (recordIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("attendance_breaks" as any)
+        .select("*")
+        .in("attendance_record_id", recordIds);
+      if (error) throw error;
+      return (data || []) as unknown as AttendanceBreak[];
+    },
+    enabled: recordIds.length > 0,
+  });
+
+  const getBreaksForRecord = (recordId: string) => {
+    return (allBreaks || []).filter(b => b.attendance_record_id === recordId);
+  };
 
   if (isLoading) {
     return (
@@ -96,6 +117,7 @@ export function MyAttendanceHistory({ employeeId }: MyAttendanceHistoryProps) {
                   <TableHead>Date</TableHead>
                   <TableHead>Clock In</TableHead>
                   <TableHead>Clock Out</TableHead>
+                  <TableHead>Breaks</TableHead>
                   <TableHead>Hours</TableHead>
                   <TableHead>Mode</TableHead>
                   <TableHead>Status</TableHead>
@@ -143,6 +165,28 @@ export function MyAttendanceHistory({ employeeId }: MyAttendanceHistoryProps) {
                           )}
                         </Tooltip>
                       </TooltipProvider>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const breaks = getBreaksForRecord(record.id);
+                        if (breaks.length === 0) return "-";
+                        const totalHrs = calculateTotalBreakHours(breaks);
+                        return (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Badge variant="outline" className="text-xs">
+                                  <Coffee className="h-3 w-3 mr-1" />
+                                  {breaks.length} · {totalHrs.toFixed(1)}h
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{breaks.length} break{breaks.length > 1 ? 's' : ''}, {totalHrs.toFixed(1)}h total</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>{formatHours(record.total_hours)}</TableCell>
                     <TableCell>

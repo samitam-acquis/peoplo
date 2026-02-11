@@ -59,7 +59,7 @@ export function PerformanceWidget() {
 
   const isLoading = goalsLoading || reviewsLoading;
 
-  // Calculate goal completion stats
+  // Calculate KPI completion stats
   const totalGoals = goals?.length || 0;
   const avgProgress = totalGoals > 0 
     ? Math.round((goals?.reduce((sum, g) => sum + (g.progress || 0), 0) || 0) / totalGoals)
@@ -95,10 +95,10 @@ export function PerformanceWidget() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Goals Progress */}
+        {/* KPIs Progress */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Active Goals</span>
+            <span className="text-muted-foreground">Active KPIs</span>
             <span className="font-medium">{totalGoals}</span>
           </div>
           <Progress value={avgProgress} className="h-2" />
@@ -107,7 +107,7 @@ export function PerformanceWidget() {
           </p>
         </div>
 
-        {/* Goals by status */}
+        {/* KPIs by status */}
         {totalGoals > 0 && (
           <div className="flex flex-wrap gap-2">
             {goals?.slice(0, 3).map((goal) => (
@@ -128,7 +128,7 @@ export function PerformanceWidget() {
         )}
 
         {totalGoals === 0 && (
-          <p className="text-sm text-muted-foreground">No active goals set</p>
+          <p className="text-sm text-muted-foreground">No active KPIs set</p>
         )}
 
         {/* Reviews Section */}

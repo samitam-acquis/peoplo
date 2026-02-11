@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Clock, LogIn, LogOut, Calendar, Briefcase, Timer, AlertTriangle, MapPin, Loader2, Home, Building2 } from "lucide-react";
+import { Clock, LogIn, LogOut, Calendar, Briefcase, Timer, AlertTriangle, MapPin, Loader2, Home, Building2, Pause, Play, Coffee } from "lucide-react";
 import { usePagination } from "@/hooks/usePagination";
 import { useSorting } from "@/hooks/useSorting";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/pagination";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { useAttendance, useTodayAttendance, useClockIn, useClockOut, useAttendanceReport, LocationData, WorkMode } from "@/hooks/useAttendance";
+import { useActiveBreak, useBreaksForRecord, usePause, useResume, calculateTotalBreakHours } from "@/hooks/useAttendanceBreaks";
 import { getExpectedHours, getShiftEndTime } from "@/lib/shiftUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -99,8 +100,12 @@ const Attendance = () => {
   const { data: todayRecord, isLoading: todayLoading } = useTodayAttendance(currentEmployee?.id);
   const { data: attendanceRecords, isLoading: recordsLoading } = useAttendance(targetDate);
   const { data: reportData, isLoading: reportLoading } = useAttendanceReport(targetDate);
+  const { data: activeBreak } = useActiveBreak(todayRecord?.id);
+  const { data: todayBreaks } = useBreaksForRecord(todayRecord?.id);
   const clockIn = useClockIn();
   const clockOut = useClockOut();
+  const pauseMutation = usePause();
+  const resumeMutation = useResume();
   // Format time for display (e.g., "09:00:00" -> "9:00 AM")
   const formatTimeDisplay = (time: string | null): string => {
     if (!time) return "--:--";
@@ -384,6 +389,34 @@ const Attendance = () => {
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
   };
 
+  const handlePause = async () => {
+    if (!todayRecord) return;
+    try {
+      toast.info("Getting your location...");
+      const location = await getCurrentLocation();
+      if (!location) return;
+      await pauseMutation.mutateAsync({ attendanceRecordId: todayRecord.id, location });
+      toast.success("Work paused — break started");
+    } catch (error) {
+      toast.error("Failed to pause");
+    }
+  };
+
+  const handleResume = async () => {
+    if (!activeBreak) return;
+    try {
+      toast.info("Getting your location...");
+      const location = await getCurrentLocation();
+      if (!location) return;
+      await resumeMutation.mutateAsync({ breakId: activeBreak.id, location });
+      toast.success("Work resumed");
+    } catch (error) {
+      toast.error("Failed to resume");
+    }
+  };
+
+  const totalBreakHours = todayBreaks ? calculateTotalBreakHours(todayBreaks) : 0;
+  const isPaused = !!activeBreak;
 
   const currentTime = new Date();
   const isClockedIn = todayRecord?.clock_in && !todayRecord?.clock_out;
@@ -509,24 +542,59 @@ const Attendance = () => {
                       </div>
                     )}
                     {isClockedIn && (
-                      <div className="flex items-center gap-2">
-                        {todayRecord?.work_mode && (
-                          <Badge variant={todayRecord.work_mode === 'wfo' ? 'default' : 'secondary'}>
-                            {todayRecord.work_mode === 'wfo' ? (
-                              <><Building2 className="h-3 w-3 mr-1" /> Office</>
-                            ) : (
-                              <><Home className="h-3 w-3 mr-1" /> Home</>
-                            )}
-                          </Badge>
-                        )}
-                        <Button onClick={handleClockOutAttempt} variant="outline" disabled={clockOut.isPending}>
-                          {clockOut.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <LogOut className="mr-2 h-4 w-4" />
+                      <div className="flex flex-col gap-2 items-center sm:items-end">
+                        <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end">
+                          {todayRecord?.work_mode && (
+                            <Badge variant={todayRecord.work_mode === 'wfo' ? 'default' : 'secondary'}>
+                              {todayRecord.work_mode === 'wfo' ? (
+                                <><Building2 className="h-3 w-3 mr-1" /> Office</>
+                              ) : (
+                                <><Home className="h-3 w-3 mr-1" /> Home</>
+                              )}
+                            </Badge>
                           )}
-                          Clock Out
-                        </Button>
+                          {isPaused ? (
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
+                              <Coffee className="h-3 w-3 mr-1" /> On Break
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isPaused ? (
+                            <Button onClick={handleResume} variant="default" disabled={resumeMutation.isPending}>
+                              {resumeMutation.isPending ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Play className="mr-2 h-4 w-4" />
+                              )}
+                              Resume
+                            </Button>
+                          ) : (
+                            <>
+                              <Button onClick={handlePause} variant="secondary" disabled={pauseMutation.isPending}>
+                                {pauseMutation.isPending ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Pause className="mr-2 h-4 w-4" />
+                                )}
+                                Pause
+                              </Button>
+                              <Button onClick={handleClockOutAttempt} variant="outline" disabled={clockOut.isPending}>
+                                {clockOut.isPending ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <LogOut className="mr-2 h-4 w-4" />
+                                )}
+                                Clock Out
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                        {todayBreaks && todayBreaks.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {todayBreaks.length} break{todayBreaks.length > 1 ? 's' : ''} · {totalBreakHours.toFixed(1)}h total
+                          </p>
+                        )}
                       </div>
                     )}
                     {todayRecord?.clock_out && (
