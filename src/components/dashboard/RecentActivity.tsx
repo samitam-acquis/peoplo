@@ -38,18 +38,42 @@ const getInitials = (name: string) => {
 async function fetchActivityLogs(): Promise<ActivityItem[]> {
   const { data, error } = await supabase
     .from("activity_logs")
-    .select("id, action, entity_type, details, created_at")
+    .select("id, action, entity_type, details, created_at, user_id")
     .order("created_at", { ascending: false })
     .limit(10);
 
   if (error) throw error;
 
-  return (data || []).map((log) => {
+  // Collect user_ids that are missing employee_name in details
+  const userIdsToResolve = new Set<string>();
+  const parsedLogs = (data || []).map((log) => {
     const details = (typeof log.details === "object" && log.details !== null)
       ? log.details as Record<string, unknown>
       : null;
+    const employeeName = (details?.employee_name as string) || "";
+    if (!employeeName && log.user_id) {
+      userIdsToResolve.add(log.user_id);
+    }
+    return { ...log, details, employeeName };
+  });
 
-    const employeeName = (details?.employee_name as string) || "Someone";
+  // Resolve missing names from profiles table
+  let nameMap: Record<string, string> = {};
+  if (userIdsToResolve.size > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", Array.from(userIdsToResolve));
+    
+    if (profiles) {
+      for (const p of profiles) {
+        if (p.full_name) nameMap[p.id] = p.full_name;
+      }
+    }
+  }
+
+  return parsedLogs.map((log) => {
+    const employeeName = log.employeeName || (log.user_id ? nameMap[log.user_id] : null) || "Someone";
     
     let status: ActivityItem["status"] = "completed";
     const action = log.action.toLowerCase();
@@ -58,9 +82,9 @@ async function fetchActivityLogs(): Promise<ActivityItem[]> {
     else if (action.includes("pending") || action === "pending") status = "pending";
     else if (action.includes("created") || action === "created") status = "created";
 
-    const entityName = details?.leave_type || 
-                       details?.asset_name ||
-                       details?.name ||
+    const entityName = log.details?.leave_type || 
+                       log.details?.asset_name ||
+                       log.details?.name ||
                        log.entity_type.replace(/_/g, " ");
 
     // Format action text based on entity type and action
@@ -84,7 +108,7 @@ async function fetchActivityLogs(): Promise<ActivityItem[]> {
       type = "";
     } else if (log.entity_type === "asset_assignment") {
       formattedAction = action.includes("return") ? "returned" : "was assigned";
-      type = String(details?.asset_name || "an asset");
+      type = String(log.details?.asset_name || "an asset");
     }
 
     return {
