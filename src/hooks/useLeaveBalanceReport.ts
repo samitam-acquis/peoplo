@@ -24,15 +24,15 @@ export function useLeaveBalanceReport(year: number) {
   return useQuery({
     queryKey: ["leave-balance-report", year],
     queryFn: async (): Promise<LeaveBalanceReport> => {
-      // Get all leave types
+      // Get all leave types with their annual allocation
       const { data: leaveTypes, error: typesError } = await supabase
         .from("leave_types")
-        .select("id, name")
+        .select("id, name, days_per_year")
         .order("name");
 
       if (typesError) throw typesError;
 
-      // Get all employees with their leave balances
+      // Get all active employees
       const { data: employees, error: empError } = await supabase
         .from("employees")
         .select(`
@@ -47,25 +47,28 @@ export function useLeaveBalanceReport(year: number) {
 
       if (empError) throw empError;
 
-      // Get leave balances for the year
-      const { data: balances, error: balError } = await supabase
-        .from("leave_balances")
-        .select("employee_id, leave_type_id, total_days, used_days")
-        .eq("year", year);
+      // Get approved leave requests for the year to calculate used days
+      const { data: leaveRequests, error: lrError } = await supabase
+        .from("leave_requests")
+        .select("employee_id, leave_type_id, days_count")
+        .eq("status", "approved")
+        .gte("start_date", `${year}-01-01`)
+        .lte("start_date", `${year}-12-31`);
 
-      if (balError) throw balError;
+      if (lrError) throw lrError;
 
-      // Build records
+      // Build records with dynamic calculation
       const records: LeaveBalanceRecord[] = (employees || []).map((emp) => {
         const employeeBalances = (leaveTypes || []).map((lt) => {
-          const balance = balances?.find(
-            (b) => b.employee_id === emp.id && b.leave_type_id === lt.id
-          );
+          const used = (leaveRequests || [])
+            .filter((lr) => lr.employee_id === emp.id && lr.leave_type_id === lt.id)
+            .reduce((sum, lr) => sum + lr.days_count, 0);
+
           return {
             leaveType: lt.name,
-            total: balance?.total_days || 0,
-            used: balance?.used_days || 0,
-            remaining: (balance?.total_days || 0) - (balance?.used_days || 0),
+            total: lt.days_per_year,
+            used,
+            remaining: lt.days_per_year - used,
           };
         });
 
