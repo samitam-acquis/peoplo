@@ -40,6 +40,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { DateRangeExportDialog } from "@/components/export/DateRangeExportDialog";
+import { useDepartments } from "@/hooks/useDepartments";
 
 const MONTHS = [
   { value: "0", label: "January" },
@@ -73,6 +74,7 @@ const Attendance = () => {
   const [workMode, setWorkMode] = useState<WorkMode>('wfo');
   const [showEarlyClockOutWarning, setShowEarlyClockOutWarning] = useState(false);
   const [earlyClockOutReasons, setEarlyClockOutReasons] = useState<{ beforeEndTime: boolean; insufficientHours: boolean }>({ beforeEndTime: false, insufficientHours: false });
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
 
   const targetDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), 1);
 
@@ -96,7 +98,13 @@ const Attendance = () => {
   const { data: todayRecord, isLoading: todayLoading } = useTodayAttendance(currentEmployee?.id);
   const { data: attendanceRecords, isLoading: recordsLoading } = useAttendance(targetDate);
   const { data: reportData, isLoading: reportLoading } = useAttendanceReport(targetDate);
+  const { data: departments } = useDepartments();
   const clockIn = useClockIn();
+
+  // Filter report data by department
+  const filteredReportData = reportData?.filter((emp) =>
+    selectedDepartment === "all" ? true : emp.department === selectedDepartment
+  );
   const clockOut = useClockOut();
   // Format time for display (e.g., "09:00:00" -> "9:00 AM")
   const formatTimeDisplay = (time: string | null): string => {
@@ -175,7 +183,7 @@ const Attendance = () => {
   };
 
   // Sorting for report data
-  const reportSorting = useSorting(reportData || []);
+  const reportSorting = useSorting(filteredReportData || []);
   
   // Sorting for attendance history
   const historySorting = useSorting(attendanceRecords || []);
@@ -686,13 +694,28 @@ const Attendance = () => {
               description={`Export attendance report for ${MONTHS[parseInt(selectedMonth)].label} ${selectedYear}. Use date filters for custom range or leave empty to export the selected month.`}
               onExportCSV={exportToCSV}
               onExportPDF={exportToPDF}
-              disabled={reportLoading || !reportData?.length}
+              disabled={reportLoading || !filteredReportData?.length}
             />
           </CardHeader>
           <CardContent>
+            <div className="mb-4">
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments?.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.name}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {reportLoading ? (
               <Skeleton className="h-64 w-full" />
-            ) : reportData && reportData.length > 0 ? (
+            ) : filteredReportData && filteredReportData.length > 0 ? (
               <>
               <div className="rounded-md border">
                 <Table>
