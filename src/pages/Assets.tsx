@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Package, Laptop, Monitor, Smartphone, ArrowUpDown } from "lucide-react";
+import { Plus, Search, Package, Laptop, Monitor, Smartphone, ArrowUpDown, ShieldAlert } from "lucide-react";
 import { usePagination } from "@/hooks/usePagination";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import { useSorting } from "@/hooks/useSorting";
@@ -316,6 +316,19 @@ const Assets = () => {
     value: stats?.phones || 0,
     icon: <Smartphone className="h-5 w-5" />
   }];
+  if (!isAdminOrHR) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-[400px] flex-col items-center justify-center space-y-4">
+          <ShieldAlert className="h-16 w-16 text-destructive" />
+          <h2 className="text-2xl font-bold text-foreground">Access Denied</h2>
+          <p className="text-muted-foreground">You don't have permission to access this page.</p>
+          <p className="text-sm text-muted-foreground">Only administrators and HR personnel can manage assets.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
