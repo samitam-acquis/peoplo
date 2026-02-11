@@ -63,7 +63,7 @@ export function TeamAnalytics({ isManager, managerId }: TeamAnalyticsProps) {
     queryFn: async () => {
       let query = supabase
         .from("employees")
-        .select("id, first_name, last_name, designation, department_id, departments(name)")
+        .select("id, first_name, last_name, designation, department_id, departments!employees_department_id_fkey(name)")
         .eq("status", "active");
 
       if (isManager && managerId) {
