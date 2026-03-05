@@ -34,7 +34,9 @@ import {
 } from "@/components/ui/pagination";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { useAttendance, useTodayAttendance, useClockIn, useClockOut, useAttendanceReport, LocationData, WorkMode } from "@/hooks/useAttendance";
+import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import { useActiveBreak, useBreaksForRecord, usePause, useResume, calculateTotalBreakHours } from "@/hooks/useAttendanceBreaks";
+import { useOfficeLocation, getDistanceMeters } from "@/components/settings/OfficeLocationSettings";
 import { getExpectedHours, getShiftEndTime } from "@/lib/shiftUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -68,6 +70,7 @@ function getStatusBadge(status: string) {
 
 const Attendance = () => {
   const { user } = useAuth();
+  const { isAdminOrHR } = useIsAdminOrHR();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [workMode, setWorkMode] = useState<WorkMode>('wfo');
@@ -102,6 +105,7 @@ const Attendance = () => {
   const { data: reportData, isLoading: reportLoading } = useAttendanceReport(targetDate);
   const { data: activeBreak } = useActiveBreak(todayRecord?.id);
   const { data: todayBreaks } = useBreaksForRecord(todayRecord?.id);
+  const { data: officeLocation } = useOfficeLocation();
   const clockIn = useClockIn();
   const clockOut = useClockOut();
   const pauseMutation = usePause();
@@ -281,9 +285,20 @@ const Attendance = () => {
         // Location is mandatory — block clock-in
         return;
       }
+
+      // Auto-detect work mode if office location is configured
+      let detectedMode = mode;
+      if (officeLocation?.latitude && officeLocation?.longitude) {
+        const distance = getDistanceMeters(
+          location.latitude, location.longitude,
+          officeLocation.latitude, officeLocation.longitude
+        );
+        const radius = officeLocation.radius_meters || 500;
+        detectedMode = distance <= radius ? 'wfo' : 'wfh';
+      }
       
-      await clockIn.mutateAsync({ employeeId: currentEmployee.id, location, workMode: mode });
-      const modeLabel = mode === 'wfh' ? 'Work From Home' : 'Work From Office';
+      await clockIn.mutateAsync({ employeeId: currentEmployee.id, location, workMode: detectedMode });
+      const modeLabel = detectedMode === 'wfh' ? 'Work From Home' : 'Work From Office';
       toast.success(`Clocked in (${modeLabel}) with location`);
     } catch (error) {
       toast.error("Failed to clock in");
@@ -483,7 +498,7 @@ const Attendance = () => {
                               ? format(new Date(todayRecord.clock_in), "hh:mm a")
                               : "--:--"}
                           </p>
-                          {todayRecord?.clock_in && calculateLateArrival(todayRecord.clock_in) > 0 && (
+                          {isAdminOrHR && todayRecord?.clock_in && calculateLateArrival(todayRecord.clock_in) > 0 && (
                             <Badge variant="destructive" className="text-xs">
                               <AlertTriangle className="h-3 w-3 mr-1" />
                               {formatLateDuration(calculateLateArrival(todayRecord.clock_in))} late
@@ -726,10 +741,14 @@ const Attendance = () => {
                 );
               }
               return (
-                <div className="grid gap-4 sm:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-5">
                   <div className="rounded-lg border bg-muted/50 p-4">
                     <p className="text-sm text-muted-foreground">Present Days</p>
                     <p className="text-2xl font-bold">{myData.presentDays}</p>
+                  </div>
+                  <div className="rounded-lg border bg-primary/10 p-4">
+                    <p className="text-sm text-muted-foreground">From Office</p>
+                    <p className="text-2xl font-bold text-primary">{myData.wfoDays}</p>
                   </div>
                   <div className="rounded-lg border bg-muted/50 p-4">
                     <p className="text-sm text-muted-foreground">Total Hours</p>
@@ -741,10 +760,12 @@ const Attendance = () => {
                       {myData.totalDays > 0 ? (myData.totalHours / myData.totalDays).toFixed(1) : "0"}h
                     </p>
                   </div>
-                  <div className="rounded-lg border bg-muted/50 p-4">
-                    <p className="text-sm text-muted-foreground">Late Arrivals</p>
-                    <p className="text-2xl font-bold">{myData.lateDays}</p>
-                  </div>
+                  {isAdminOrHR && (
+                    <div className="rounded-lg border bg-muted/50 p-4">
+                      <p className="text-sm text-muted-foreground">Late Arrivals</p>
+                      <p className="text-2xl font-bold">{myData.lateDays}</p>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -760,7 +781,7 @@ const Attendance = () => {
             </div>
             {attendanceRecords && attendanceRecords.length > 0 && (
               <div className="flex flex-wrap items-center gap-3">
-                {countLateArrivals() > 0 && (
+                {isAdminOrHR && countLateArrivals() > 0 && (
                   <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 border border-red-100">
                     <AlertTriangle className="h-4 w-4 text-red-500" />
                     <div className="text-sm">
@@ -769,13 +790,15 @@ const Attendance = () => {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-                  <Timer className="h-4 w-4 text-orange-500" />
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Overtime: </span>
-                    <span className="font-semibold text-orange-600">{calculateMonthlyOvertime().toFixed(2)} hrs</span>
+                {isAdminOrHR && (
+                  <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
+                    <Timer className="h-4 w-4 text-orange-500" />
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Overtime: </span>
+                      <span className="font-semibold text-orange-600">{calculateMonthlyOvertime().toFixed(2)} hrs</span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
           </CardHeader>
@@ -807,7 +830,7 @@ const Attendance = () => {
                       >
                         Total Hours
                       </SortableTableHead>
-                      <TableHead>Overtime</TableHead>
+                      {isAdminOrHR && <TableHead>Overtime</TableHead>}
                       <TableHead>Mode</TableHead>
                       <TableHead>Location</TableHead>
                       <SortableTableHead
@@ -842,7 +865,7 @@ const Attendance = () => {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {record.clock_in ? format(new Date(record.clock_in), "hh:mm a") : "-"}
-                              {lateMinutes > 0 && (
+                              {isAdminOrHR && lateMinutes > 0 && (
                                 <Badge variant="destructive" className="text-xs">
                                   <AlertTriangle className="h-3 w-3 mr-1" />
                                   {formatLateDuration(lateMinutes)} late
@@ -856,15 +879,17 @@ const Attendance = () => {
                           <TableCell>
                             {record.total_hours ? `${record.total_hours.toFixed(2)} hrs` : "-"}
                           </TableCell>
-                          <TableCell>
-                            {overtime > 0 ? (
-                              <Badge variant="secondary" className="text-xs">
-                                +{overtime.toFixed(2)} hrs
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
+                          {isAdminOrHR && (
+                            <TableCell>
+                              {overtime > 0 ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  +{overtime.toFixed(2)} hrs
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell>
                             {record.work_mode ? (
                               <Badge variant={record.work_mode === 'wfo' ? 'default' : 'secondary'} className="text-xs">
