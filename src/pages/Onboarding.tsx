@@ -906,15 +906,20 @@ const Onboarding = () => {
             <TabsTrigger value="pending" className="w-full justify-center">
               <span className="hidden sm:inline">Pending</span>
               <span className="sm:hidden">Pending</span>
-              {onboardingEmployees.length > 0 && (
+              {(onboardingEmployees.length + approvedRequests.filter(r => !hasEmployeeRecord(r.user_id)).length) > 0 && (
                 <Badge variant="secondary" className="ml-2">
-                  {onboardingEmployees.length}
+                  {onboardingEmployees.length + approvedRequests.filter(r => !hasEmployeeRecord(r.user_id)).length}
                 </Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="requests" className="w-full justify-center">
               <span className="hidden sm:inline">Requests</span>
               <span className="sm:hidden">Requests</span>
+              {pendingRequests.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {pendingRequests.length}
+                </Badge>
+              )}
               {pendingRequests.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {pendingRequests.length}
