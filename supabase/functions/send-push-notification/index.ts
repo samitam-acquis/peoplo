@@ -123,6 +123,16 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication: Verify the caller using a shared secret
+    const pushSecret = req.headers.get("x-push-secret");
+    const expectedSecret = Deno.env.get("CRON_SECRET");
+    if (!expectedSecret || !pushSecret || pushSecret !== expectedSecret) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden: invalid or missing x-push-secret" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { user_ids, title, body, icon, url } = await req.json();
 
