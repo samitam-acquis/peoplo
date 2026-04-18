@@ -101,7 +101,7 @@ const Attendance = () => {
 
   // Now fetch today's attendance for the current employee specifically
   const { data: todayRecord, isLoading: todayLoading } = useTodayAttendance(currentEmployee?.id);
-  const { data: attendanceRecords, isLoading: recordsLoading } = useAttendance(targetDate);
+  const { data: attendanceRecords, isLoading: recordsLoading } = useAttendance(targetDate, currentEmployee?.id);
   const { data: reportData, isLoading: reportLoading } = useAttendanceReport(targetDate);
   const { data: activeBreak } = useActiveBreak(todayRecord?.id);
   const { data: todayBreaks } = useBreaksForRecord(todayRecord?.id);
@@ -280,26 +280,33 @@ const Attendance = () => {
     try {
       toast.info("Getting your location...");
       const location = await getCurrentLocation();
-      
-      if (!location) {
-        // Location is mandatory — block clock-in
+
+      // For WFO, location is mandatory; for WFH it's optional
+      if (mode === 'wfo' && !location) {
+        toast.error("Location is required to clock in from office");
         return;
       }
 
-      // Auto-detect work mode if office location is configured
+      // Auto-detect work mode only when location is available and office is configured
       let detectedMode = mode;
-      if (officeLocation?.latitude && officeLocation?.longitude) {
+      if (location && officeLocation?.latitude && officeLocation?.longitude) {
         const distance = getDistanceMeters(
           location.latitude, location.longitude,
           officeLocation.latitude, officeLocation.longitude
         );
         const radius = officeLocation.radius_meters || 500;
         detectedMode = distance <= radius ? 'wfo' : 'wfh';
+
+        // If user chose WFO but is outside office radius, block it
+        if (mode === 'wfo' && detectedMode === 'wfh') {
+          toast.error(`You are not at the office location (${Math.round(distance)}m away). Please choose Work From Home instead.`);
+          return;
+        }
       }
-      
+
       await clockIn.mutateAsync({ employeeId: currentEmployee.id, location, workMode: detectedMode });
       const modeLabel = detectedMode === 'wfh' ? 'Work From Home' : 'Work From Office';
-      toast.success(`Clocked in (${modeLabel}) with location`);
+      toast.success(location ? `Clocked in (${modeLabel}) with location` : `Clocked in (${modeLabel})`);
     } catch (error) {
       toast.error("Failed to clock in");
     }

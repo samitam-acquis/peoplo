@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { isValidEmployeeCode } from "@/hooks/useNextEmployeeCode";
 import {
@@ -32,6 +32,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { EmployeeLeaveEligibility, type EmployeeLeaveEligibilityHandle } from "./EmployeeLeaveEligibility";
 
 const WEEKDAYS = [
   { value: 0, label: 'Sun' },
@@ -161,6 +162,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
 
   const [showHistory, setShowHistory] = useState(false);
   const [isDepartmentManager, setIsDepartmentManager] = useState(false);
+  const eligibilityRef = useRef<EmployeeLeaveEligibilityHandle>(null);
 
   // Update salary data when structure is loaded
   useEffect(() => {
@@ -405,7 +407,12 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
       if (salaryData.basic_salary) {
         await salaryMutation.mutateAsync(salaryData);
       }
-      
+
+      // Save leave eligibility selections
+      if (eligibilityRef.current) {
+        await eligibilityRef.current.save();
+      }
+
       toast.success("Employee updated successfully");
       onOpenChange(false);
     } catch {
@@ -447,11 +454,12 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="basic">Basic Info</TabsTrigger>
                 <TabsTrigger value="job">Job Details</TabsTrigger>
                 <TabsTrigger value="schedule">Schedule</TabsTrigger>
                 <TabsTrigger value="salary">Salary</TabsTrigger>
+                <TabsTrigger value="leaves">Leaves</TabsTrigger>
               </TabsList>
               
               <TabsContent value="basic" className="space-y-4 mt-4">
@@ -983,6 +991,16 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                       </Collapsible>
                     )}
                   </>
+                )}
+              </TabsContent>
+
+              <TabsContent value="leaves" className="space-y-4 mt-4">
+                {employee?.id ? (
+                  <EmployeeLeaveEligibility ref={eligibilityRef} employeeId={employee.id} />
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Save the employee first to manage leave eligibility.
+                  </div>
                 )}
               </TabsContent>
             </Tabs>
